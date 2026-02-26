@@ -6,3 +6,10 @@ venv/
 .DS_Store
 Thumbs.db
 *.log
+
+# Frontend / node
+node_modules/
+package-lock.json
+
+# Old spring file (ignore)
+application.properties
