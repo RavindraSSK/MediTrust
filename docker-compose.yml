@@ -1,0 +1,17 @@
+services:
+  db:
+    image: postgres:16
+    container_name: meditrust_db
+    restart: always
+    environment:
+      POSTGRES_USER: meditrust
+      POSTGRES_PASSWORD: meditrust_pw
+      POSTGRES_DB: meditrust_db
+    ports:
+
+      - "5433:5432"
+    volumes:
+      - meditrust_pgdata:/var/lib/postgresql/data
+
+volumes:
+  meditrust_pgdata:
