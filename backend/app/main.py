@@ -70,7 +70,7 @@ def health():
 @app.get("/db-health")
 def db_health(db: Session = Depends(get_db)):
     db.execute(text("SELECT 1"))
-    return {"database": "PostgreSQL connected ✅"}
+    return {"database": "PostgreSQL connected "}
 
 # --------------------------------------------------
 # AUTH ROUTES
