@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Create Account | MediTrust</title>
+
+  <link rel="stylesheet" href="style.css" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
+
+  <!--  JS with defer -->
+  <script src="script.js" defer></script>
+</head>
+
+<body>
+  <div class="container">
+    <div class="login-card">
+      <h1>Create Account</h1>
+      <p class="subtitle">Create an account to access MediTrust.</p>
+
+      <form id="signupForm">
+
+        <div class="row">
+          <div class="input-icon">
+            <i class="fa fa-user"></i>
+            <input type="text" id="firstName" placeholder="First Name" required />
+          </div>
+
+          <div class="input-icon">
+            <i class="fa fa-user"></i>
+            <input type="text" id="lastName" placeholder="Last Name" required />
+          </div>
+        </div>
+
+        <div class="input-icon">
+          <i class="fa fa-envelope"></i>
+          <input type="email" id="email" placeholder="Email Address" required />
+        </div>
+
+        <div class="input-icon">
+          <i class="fa fa-lock"></i>
+          <input type="password" id="password" placeholder="New Password (min 6 chars)" minlength="6" required />
+        </div>
+
+        <div class="input-icon">
+          <i class="fa fa-lock"></i>
+          <input type="password" id="confirmPassword" placeholder="Confirm Password" minlength="6" required />
+        </div>
+
+        <button type="submit">Create Account</button>
+
+        <p class="footer-text">
+          Already have an account?
+          <a href="index.html">Login</a>
+        </p>
+
+      </form>
+    </div>
+  </div>
+</body>
+</html>
