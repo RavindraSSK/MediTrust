@@ -1,0 +1,353 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>MediTrust | Risk Assessment</title>
+
+  <style>
+    :root{
+      --bg:#f4f7fb;
+      --card:#ffffff;
+      --text:#0f172a;
+      --muted:#64748b;
+      --primary:#2563eb;
+      --primary2:#1d4ed8;
+      --border:#e2e8f0;
+      --shadow: 0 18px 45px rgba(0,0,0,.08);
+    }
+    *{box-sizing:border-box}
+
+    body{
+      margin:0;
+      font-family: system-ui, -apple-system, sans-serif;
+      background:
+        radial-gradient(circle at 18% 12%, #e0f2fe, transparent 45%),
+        radial-gradient(circle at 80% 0%, #ede9fe, transparent 45%),
+        var(--bg);
+      min-height:100vh;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      padding:24px;
+      color:var(--text);
+    }
+
+    .wrapper{width:min(720px, 100%)}
+
+    .card{
+      background:var(--card);
+      border:1px solid var(--border);
+      border-radius:18px;
+      padding:26px;
+      box-shadow:var(--shadow);
+    }
+
+    .topbar{
+      display:flex;
+      align-items:flex-start;
+      justify-content:space-between;
+      gap:16px;
+      margin-bottom:10px;
+    }
+
+    h1{
+      margin:0;
+      font-size:30px;
+      font-weight:750;
+      letter-spacing:.2px;
+    }
+
+    .subtitle{
+      margin:8px 0 0;
+      font-size:14px;
+      color:var(--muted);
+      line-height:1.5;
+      max-width:54ch;
+    }
+
+    .pill{
+      font-size:12px;
+      padding:7px 12px;
+      border-radius:999px;
+      border:1px solid var(--border);
+      background:#f8fafc;
+      color:var(--muted);
+      user-select:none;
+      white-space:nowrap;
+    }
+
+    .actions{
+      display:flex;
+      gap:10px;
+      align-items:center;
+      justify-content:flex-start;
+      margin-top:10px;
+    }
+
+    .btn-secondary{
+      border:1px solid var(--border);
+      background:white;
+      color:var(--text);
+      padding:10px 12px;
+      border-radius:12px;
+      font-weight:600;
+      cursor:pointer;
+      transition:.2s ease;
+    }
+    .btn-secondary:hover{transform:translateY(-1px)}
+    .btn-secondary:active{transform:translateY(0)}
+
+    label{
+      font-size:13px;
+      color:var(--muted);
+      display:block;
+      margin-bottom:6px;
+    }
+
+    input{
+      width:100%;
+      padding:12px;
+      border-radius:12px;
+      border:1px solid var(--border);
+      font-size:15px;
+      outline:none;
+      background:white;
+    }
+
+    input:focus{
+      border-color:#93c5fd;
+      box-shadow:0 0 0 4px rgba(59,130,246,.15);
+    }
+
+    .row{
+      display:grid;
+      grid-template-columns:1.6fr .8fr;
+      gap:14px;
+      margin-top:18px;
+    }
+
+    .btn{
+      width:100%;
+      margin-top:18px;
+      padding:13px;
+      border:none;
+      border-radius:12px;
+      font-weight:700;
+      font-size:15px;
+      background:linear-gradient(180deg,var(--primary),var(--primary2));
+      color:white;
+      cursor:pointer;
+      transition: all .2s ease;
+    }
+
+    .btn:hover{
+      transform:translateY(-1px);
+      box-shadow:0 8px 20px rgba(37,99,235,.25);
+    }
+
+    .btn:disabled{
+      opacity:.65;
+      cursor:not-allowed;
+      transform:none;
+      box-shadow:none;
+    }
+
+    .alert{
+      display:none;
+      margin-top:14px;
+      padding:12px 12px;
+      border-radius:12px;
+      font-size:14px;
+      border:1px solid var(--border);
+      background:#f8fafc;
+      color:var(--text);
+    }
+
+    .alert.error{
+      background:#fff1f2;
+      border-color:#fecdd3;
+      color:#991b1b;
+    }
+
+    .result{
+      display:none;
+      margin-top:22px;
+      padding:18px;
+      border-radius:14px;
+      border:1px solid var(--border);
+      background:#f8fafc;
+      opacity:0;
+      transform:translateY(8px);
+      transition: all .25s ease;
+    }
+
+    .result.show{display:block}
+    .result.visible{opacity:1; transform:translateY(0)}
+
+    .headline{
+      display:flex;
+      justify-content:space-between;
+      align-items:center;
+      gap:12px;
+    }
+
+    .badge{
+      font-size:12px;
+      padding:6px 12px;
+      border-radius:999px;
+      border:1px solid var(--border);
+      background:white;
+      color:var(--muted);
+      white-space:nowrap;
+    }
+
+    .grid{
+      display:grid;
+      grid-template-columns:1fr 1fr;
+      gap:14px;
+      margin-top:16px;
+    }
+
+    .box{
+      background:white;
+      border:1px solid var(--border);
+      border-radius:12px;
+      padding:14px;
+    }
+
+    .box small{
+      color:var(--muted);
+      font-size:12px;
+    }
+
+    .box strong{
+      display:block;
+      margin-top:6px;
+      font-size:22px;
+      font-weight:800;
+    }
+
+    .meter{margin-top:16px}
+    .meter-head{
+      display:flex;
+      justify-content:space-between;
+      color:var(--muted);
+      font-size:12px;
+      margin-bottom:6px;
+    }
+
+    .bar-container{
+      height:10px;
+      border-radius:999px;
+      background:#e2e8f0;
+      overflow:hidden;
+      border:1px solid var(--border);
+    }
+
+    .bar{
+      height:100%;
+      width:0%;
+      background:linear-gradient(90deg,#22c55e,#f59e0b,#ef4444);
+      transition: width .35s ease;
+    }
+
+    .note{
+      margin-top:14px;
+      font-size:13px;
+      color:var(--muted);
+      line-height:1.5;
+    }
+
+    .footer{
+      margin-top:22px;
+      padding-top:14px;
+      border-top:1px solid var(--border);
+      font-size:12px;
+      color:var(--muted);
+      display:flex;
+      justify-content:space-between;
+      gap:10px;
+      flex-wrap:wrap;
+    }
+  </style>
+</head>
+
+<body>
+<div class="wrapper">
+  <div class="card">
+
+    <div class="topbar">
+      <div>
+        <h1>MediTrust</h1>
+        <div class="subtitle">
+          Clinician risk screening tool. Enter patient details to estimate risk level.
+          This is a preliminary assessment and does not replace clinical judgement.
+        </div>
+
+        <div class="actions">
+          <button id="logoutBtn" class="btn-secondary" type="button">Logout</button>
+        </div>
+      </div>
+
+      <div class="pill">Risk Assessment</div>
+    </div>
+
+    <div class="row">
+      <div>
+        <label for="name">Patient name</label>
+        <input id="name" placeholder="e.g., Ravi Kumar" autocomplete="off" />
+      </div>
+      <div>
+        <label for="age">Age</label>
+        <input id="age" type="number" min="1" max="120" placeholder="e.g., 27" />
+      </div>
+    </div>
+
+    <button id="btn" class="btn" type="button">Check Risk</button>
+
+    <div id="alert" class="alert"></div>
+
+    <div id="result" class="result">
+      <div class="headline">
+        <strong>Assessment Result</strong>
+        <div id="badge" class="badge">—</div>
+      </div>
+
+      <div class="grid">
+        <div class="box">
+          <small>Risk level</small>
+          <strong id="riskLevel">—</strong>
+        </div>
+
+        <div class="box">
+          <small>Risk score</small>
+          <strong id="riskScore">—</strong>
+        </div>
+      </div>
+
+      <div class="meter">
+        <div class="meter-head">
+          <span>Lower</span>
+          <span>Higher</span>
+        </div>
+        <div class="bar-container">
+          <div id="bar" class="bar"></div>
+        </div>
+      </div>
+
+      <div id="note" class="note"></div>
+    </div>
+
+    <div class="footer">
+      <div>© 2026 MediTrust</div>
+      
+    </div>
+
+  </div>
+</div>
+
+<!--  Important: load shared script (handles login + API call) -->
+<script src="script.js"></script>
+</body>
+</html>
