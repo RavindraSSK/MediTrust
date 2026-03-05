@@ -1,9 +1,19 @@
+# Python
 __pycache__/
 *.pyc
+
+# Virtual environments
 .venv/
 venv/
 .env
+
+# OS files
 .DS_Store
 Thumbs.db
+
+# Logs
 *.log
-ml/models/model.joblib
+
+# ML artifacts
+ml/models/*.joblib
+ml/data/processed/*.csv

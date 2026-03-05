@@ -150,11 +150,45 @@ def assess(data: AssessmentIn, db: Session = Depends(get_db)):
 # ML PREDICTION ROUTE
 # --------------------------------------------------
 @app.post("/predict", response_model=PredictResponse, tags=["Prediction"])
-def predict(req: PredictRequest):
-    prob = predict_probability(req.model_dump())
+def predict(req: PredictRequest, db: Session = Depends(get_db)):
+
+    payload = req.model_dump()
+
+    prob = predict_probability(payload)
     level, msg = risk_level_from_probability(prob)
+
+    # Save prediction log
+    log = models.PredictionLog(
+        **payload,
+        risk_probability=prob,
+        risk_level=level
+    )
+
+    db.add(log)
+    db.commit()
+
     return PredictResponse(
         risk_probability=prob,
         risk_level=level,
-        triage_recommendation=msg,
+        triage_recommendation=msg
     )
+
+@app.get("/predictions/recent", tags=["Prediction"])
+def recent_predictions(db: Session = Depends(get_db)):
+
+    rows = (
+        db.query(models.PredictionLog)
+        .order_by(models.PredictionLog.id.desc())
+        .limit(10)
+        .all()
+    )
+
+    return [
+        {
+            "id": r.id,
+            "risk_probability": r.risk_probability,
+            "risk_level": r.risk_level,
+            "created_at": r.created_at
+        }
+        for r in rows
+    ]
