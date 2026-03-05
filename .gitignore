@@ -6,3 +6,4 @@ venv/
 .DS_Store
 Thumbs.db
 *.log
+ml/models/model.joblib
