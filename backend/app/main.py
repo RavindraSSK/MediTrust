@@ -13,7 +13,11 @@ from .schemas import (
     RegisterIn,
     LoginIn,
     AuthOut,
+    PredictRequest,
+    PredictResponse,
 )
+from .ml_service import predict_probability
+from .risk import risk_level_from_probability
 
 
 app = FastAPI(title="MediTrust API", version="0.1")
@@ -21,9 +25,7 @@ app = FastAPI(title="MediTrust API", version="0.1")
 # Password hashing setup
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
-
 # CORS Configuration (for Live Server frontend)
-
 ALLOWED_ORIGINS = [
     "http://127.0.0.1:5500",
     "http://localhost:5500",
@@ -46,10 +48,10 @@ app.add_middleware(
 
 
 # Startup: Create Tables Automatically
-
 @app.on_event("startup")
 def on_startup():
     Base.metadata.create_all(bind=engine)
+
 
 # --------------------------------------------------
 # Basic Routes
@@ -63,14 +65,17 @@ def root():
         "db": "/db-health",
     }
 
+
 @app.get("/health")
 def health():
     return {"status": "ok"}
+
 
 @app.get("/db-health")
 def db_health(db: Session = Depends(get_db)):
     db.execute(text("SELECT 1"))
     return {"database": "PostgreSQL connected ✅"}
+
 
 # --------------------------------------------------
 # AUTH ROUTES
@@ -94,9 +99,9 @@ def register(data: RegisterIn, db: Session = Depends(get_db)):
     db.commit()
     return {"ok": True, "message": "Account created successfully."}
 
+
 @app.post("/auth/login", response_model=AuthOut)
 def login(data: LoginIn, db: Session = Depends(get_db)):
-
     email = data.email.lower().strip()
 
     user = db.query(User).filter(User.email == email).first()
@@ -107,6 +112,7 @@ def login(data: LoginIn, db: Session = Depends(get_db)):
         return {"ok": False, "message": "Invalid email or password."}
 
     return {"ok": True, "message": "Login successful."}
+
 
 # --------------------------------------------------
 # RISK ASSESSMENT ROUTE
@@ -137,4 +143,18 @@ def assess(data: AssessmentIn, db: Session = Depends(get_db)):
         risk_level=record.risk_level,
         risk_score=record.risk_score,
         saved_id=record.id,
+    )
+
+
+# --------------------------------------------------
+# ML PREDICTION ROUTE
+# --------------------------------------------------
+@app.post("/predict", response_model=PredictResponse, tags=["Prediction"])
+def predict(req: PredictRequest):
+    prob = predict_probability(req.model_dump())
+    level, msg = risk_level_from_probability(prob)
+    return PredictResponse(
+        risk_probability=prob,
+        risk_level=level,
+        triage_recommendation=msg,
     )
