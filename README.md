@@ -7,7 +7,7 @@
 - Implemented database models
 - Established GitHub project management workflow
 
-## Sprint 2 (in progress)
+## Sprint 2 (completed)
 - Integrate Machine Learning model for cardiovascular risk prediction
 - Develop /predict API endpoint
 - Store predictions in database
