@@ -1,6 +1,4 @@
-
-// MediTrust Frontend Script 
-
+// MediTrust Frontend Script
 
 const API_BASE = "http://127.0.0.1:8000";
 
@@ -91,7 +89,7 @@ async function loginUser(email, password) {
   return await res.json();
 }
 
-// ---------- RISK API ----------
+// ---------- RISK API (Sprint 1 dummy) ----------
 async function assessRisk(fullName, age) {
   const res = await fetch(`${API_BASE}/assess`, {
     method: "POST",
@@ -106,6 +104,21 @@ async function assessRisk(fullName, age) {
   return await res.json();
 }
 
+// ---------- ML PREDICT API (Sprint 2) ----------
+async function predictRisk(payload) {
+  const res = await fetch(`${API_BASE}/predict`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+
+  if (!res.ok) {
+    const txt = await res.text();
+    throw new Error(`Predict API error ${res.status}: ${txt}`);
+  }
+  return await res.json();
+}
+
 // ---------- MediTrust UI ----------
 function renderRiskResult(data) {
   const riskLevelEl = pickId("riskLevel");
@@ -116,22 +129,34 @@ function renderRiskResult(data) {
   const barEl     = pickId("riskBarFill", "bar");
   const resultSec = pickId("resultSection", "result");
 
-  const riskLevel = data.risk_level || "-";
-  const score = safeNumber(data.risk_score);
+  // Supports BOTH:
+  // Sprint 1: { risk_level, risk_score }
+  // Sprint 2: { risk_level, risk_probability, triage_recommendation }
+  const riskLevel = data.risk_level || data.risk_level || "-";
+
+  const score =
+    safeNumber(data.risk_probability) !== null ? safeNumber(data.risk_probability)
+    : safeNumber(data.risk_score);
 
   setText(riskLevelEl, riskLevel);
   setText(riskScoreEl, score !== null ? `${Math.round(score * 100)}%` : "-");
 
   if (badgeEl) {
-    badgeEl.textContent = riskLevel === "High" ? "Needs attention" : "Low concern";
-    badgeEl.className = riskLevel === "High" ? "badge badge-high" : "badge badge-low";
+    badgeEl.textContent =
+      riskLevel === "High" ? "Needs attention"
+      : riskLevel === "Medium" ? "Priority review"
+      : "Low concern";
   }
 
   if (adviceEl) {
-    adviceEl.textContent =
-      riskLevel === "High"
-        ? "Consider scheduling a checkup. If you have symptoms or concerns, seek medical guidance."
-        : "Maintain healthy habits and follow routine checkups as recommended.";
+    if (data.triage_recommendation) {
+      adviceEl.textContent = data.triage_recommendation;
+    } else {
+      adviceEl.textContent =
+        riskLevel === "High"
+          ? "Consider scheduling a checkup. If you have symptoms or concerns, seek medical guidance."
+          : "Maintain healthy habits and follow routine checkups as recommended.";
+    }
   }
 
   if (barEl && score !== null) {
@@ -194,7 +219,7 @@ function initSignupPage() {
         return;
       }
 
-      alert(out.message); // "Account created successfully."
+      alert(out.message);
       go(PAGE_LOGIN);
     } catch (err) {
       alert("Registration failed: " + (err?.message || err));
@@ -246,6 +271,20 @@ function initMediTrustPage() {
   const btn    = pickId("checkRiskBtn", "btn");
   const form   = pickId("riskForm"); // may be null
 
+  // NEW inputs for ML /predict
+  const sexEl     = pickId("sex");
+  const cpEl      = pickId("cp");
+  const trestbpsEl= pickId("trestbps");
+  const cholEl    = pickId("chol");
+  const fbsEl     = pickId("fbs");
+  const restecgEl = pickId("restecg");
+  const thalachEl = pickId("thalach");
+  const exangEl   = pickId("exang");
+  const oldpeakEl = pickId("oldpeak");
+  const slopeEl   = pickId("slope");
+  const caEl      = pickId("ca");
+  const thalEl    = pickId("thal");
+
   const handler = async (e) => {
     if (e) e.preventDefault();
     clearError();
@@ -258,11 +297,45 @@ function initMediTrustPage() {
 
     if (btn) {
       btn.disabled = true;
-      btn.textContent = "Checking...";
+      btn.textContent = "Predicting...";
     }
 
     try {
-      const data = await assessRisk(name, age);
+      // If ML fields exist, use /predict (Sprint 2). Otherwise fallback to /assess (Sprint 1).
+      const hasMLFields =
+        !!(sexEl && cpEl && trestbpsEl && cholEl && fbsEl && restecgEl && thalachEl && exangEl && oldpeakEl && slopeEl && caEl && thalEl);
+
+      let data;
+
+      if (hasMLFields) {
+        const payload = {
+          age: age,
+          sex: Number(sexEl.value),
+          cp: Number(cpEl.value),
+          trestbps: Number(trestbpsEl.value),
+          chol: Number(cholEl.value),
+          fbs: Number(fbsEl.value),
+          restecg: Number(restecgEl.value),
+          thalach: Number(thalachEl.value),
+          exang: Number(exangEl.value),
+          oldpeak: Number(oldpeakEl.value),
+          slope: Number(slopeEl.value),
+          ca: Number(caEl.value),
+          thal: Number(thalEl.value),
+        };
+
+        // basic sanity checks
+        for (const [k, v] of Object.entries(payload)) {
+          if (!Number.isFinite(v)) {
+            return renderError(`Please enter a valid number for ${k}.`);
+          }
+        }
+
+        data = await predictRisk(payload);
+      } else {
+        data = await assessRisk(name, age);
+      }
+
       renderRiskResult(data);
     } catch (err) {
       console.error(err);
@@ -270,7 +343,7 @@ function initMediTrustPage() {
     } finally {
       if (btn) {
         btn.disabled = false;
-        btn.textContent = "Check Risk";
+        btn.textContent = "Predict Risk";
       }
     }
   };
