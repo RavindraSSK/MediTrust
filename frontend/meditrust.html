@@ -6,6 +6,10 @@
   <title>MediTrust | Risk Assessment</title>
 
   <link rel="stylesheet" href="css/meditrust.css" />
+<<<<<<< HEAD
+=======
+
+>>>>>>> 57aedfb3427f5818189a03bb2382b38a6496de74
   <script type="module" src="js/script.js"></script>
 </head>
 
@@ -219,6 +223,165 @@
       </div>
 
     </div>
+<<<<<<< HEAD
   </div>
+=======
+
+    <div class="section-box">
+      <div class="section-header">
+        <div>
+          <div class="section-title">Clinical Parameters</div>
+          <div class="section-subtitle">Provide the core cardiac indicators used by the prediction model.</div>
+        </div>
+      </div>
+
+      <div class="grid3">
+        <div class="field-card">
+          <label for="sex">Sex <span class="required-star">*</span></label>
+          <select id="sex">
+            <option value="1">Male</option>
+            <option value="0">Female</option>
+          </select>
+          <span class="hint">Biological sex of the patient.</span>
+        </div>
+
+        <div class="field-card">
+          <label for="cp">Chest pain type <span class="required-star">*</span></label>
+          <select id="cp">
+            <option value="1">Typical angina</option>
+            <option value="2">Atypical angina</option>
+            <option value="3" selected>Non-anginal pain</option>
+            <option value="4">Asymptomatic</option>
+          </select>
+          <span class="hint">Type of chest discomfort reported by the patient.</span>
+        </div>
+
+        <div class="field-card">
+          <label for="trestbps">Resting blood pressure <span class="required-star">*</span></label>
+          <input id="trestbps" type="number" min="60" max="250" value="140" />
+          <span class="hint">Resting blood pressure in mmHg.</span>
+        </div>
+
+        <div class="field-card">
+          <label for="chol">Cholesterol level <span class="required-star">*</span></label>
+          <input id="chol" type="number" min="80" max="700" value="250" />
+          <span class="hint">Serum cholesterol level in mg/dL.</span>
+        </div>
+
+        <div class="field-card">
+          <label for="fbs">High fasting blood sugar <span class="required-star">*</span></label>
+          <select id="fbs">
+            <option value="0" selected>No</option>
+            <option value="1">Yes</option>
+          </select>
+          <span class="hint">Whether fasting blood sugar is above 120 mg/dL.</span>
+        </div>
+
+        <div class="field-card">
+          <label for="restecg">Resting ECG result <span class="required-star">*</span></label>
+          <select id="restecg">
+            <option value="0">Normal</option>
+            <option value="1" selected>ST-T abnormality</option>
+            <option value="2">LV hypertrophy</option>
+          </select>
+          <span class="hint">Electrocardiogram result at rest.</span>
+        </div>
+
+        <div class="field-card">
+          <label for="thalach">Maximum heart rate <span class="required-star">*</span></label>
+          <input id="thalach" type="number" min="60" max="240" value="150" />
+          <span class="hint">Maximum heart rate achieved during exercise test.</span>
+        </div>
+
+        <div class="field-card">
+          <label for="exang">Exercise-induced angina <span class="required-star">*</span></label>
+          <select id="exang">
+            <option value="0" selected>No</option>
+            <option value="1">Yes</option>
+          </select>
+          <span class="hint">Indicates chest pain triggered by exercise.</span>
+        </div>
+
+        <div class="field-card">
+          <label for="oldpeak">ST depression (oldpeak) <span class="required-star">*</span></label>
+          <input id="oldpeak" type="number" step="0.1" min="0" max="10" value="1.2" />
+          <span class="hint">ST depression induced by exercise relative to rest.</span>
+        </div>
+
+        <div class="field-card">
+          <label for="slope">ST segment slope <span class="required-star">*</span></label>
+          <select id="slope">
+            <option value="1">Upsloping</option>
+            <option value="2" selected>Flat</option>
+            <option value="3">Downsloping</option>
+          </select>
+          <span class="hint">Slope of the peak exercise ST segment.</span>
+        </div>
+
+        <div class="field-card">
+          <label for="ca">Major vessels count <span class="required-star">*</span></label>
+          <select id="ca">
+            <option value="0" selected>0</option>
+            <option value="1">1</option>
+            <option value="2">2</option>
+            <option value="3">3</option>
+          </select>
+          <span class="hint">Number of major vessels observed by fluoroscopy.</span>
+        </div>
+
+        <div class="field-card">
+          <label for="thal">Thallium test result <span class="required-star">*</span></label>
+          <select id="thal">
+            <option value="3" selected>Normal</option>
+            <option value="6">Fixed defect</option>
+            <option value="7">Reversible defect</option>
+          </select>
+          <span class="hint">Thallium stress test result category.</span>
+        </div>
+      </div>
+
+      <div class="helper-box">
+        <b>Tip:</b> Use clinically realistic values while testing. Extremely high or low values can strongly affect the risk score and move the output toward a high-risk prediction.
+      </div>
+    </div>
+
+    <button id="btn" class="btn" type="button">Predict Risk</button>
+
+    <div id="alert" class="alert"></div>
+
+    <div id="result" class="result">
+      <div class="risk-fluid">
+        <div class="result-title">Assessment Result</div>
+
+        <div id="riskScore" class="risk-score-big">—</div>
+
+        <div class="risk-inline">
+          <div id="riskLevel" class="risk-level-text">—</div>
+          <div id="badge" class="risk-status-badge neutral">—</div>
+        </div>
+
+        <div class="risk-meter">
+          <div class="meter-labels">
+            <span>Lower</span>
+            <span>Higher</span>
+          </div>
+
+          <div class="meter-track">
+            <div id="bar" class="meter-fill"></div>
+          </div>
+        </div>
+
+        <div id="note" class="risk-note"></div>
+      </div>
+    </div>
+
+    <div class="footer">
+      <div>© 2026 MediTrust</div>
+      <div>AI-assisted screening prototype</div>
+    </div>
+
+  </div>
+</div>
+>>>>>>> 57aedfb3427f5818189a03bb2382b38a6496de74
 </body>
 </html>

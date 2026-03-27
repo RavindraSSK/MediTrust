@@ -667,3 +667,280 @@ input:focus, select:focus{
   font-size: 13px;
   opacity: 0.8;
 }
+
+.professional-clinical-box {
+  background: #f7f9fc;
+  border: 1px solid #d9e2ec;
+  border-radius: 14px;
+  padding: 22px;
+}
+
+.professional-clinical-box h3 {
+  margin-bottom: 14px;
+  color: #12355b;
+  font-size: 1.55rem;
+  font-weight: 700;
+}
+
+.clinical-summary-text {
+  margin-bottom: 14px;
+  color: #334e68;
+  line-height: 1.7;
+  font-size: 1rem;
+}
+
+.clinical-factor-list {
+  margin: 0 0 16px 0;
+  padding-left: 22px;
+}
+
+.clinical-factor-list li {
+  margin-bottom: 10px;
+  line-height: 1.6;
+}
+
+.clinical-value {
+  display: inline-block;
+  margin-left: 6px;
+  color: #64748b;
+  font-size: 0.95rem;
+}
+
+.clinical-conclusion {
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px solid #dbe7f3;
+  color: #1e3a5f;
+  font-weight: 500;
+  line-height: 1.7;
+}
+
+.risk-up {
+  color: #b42318;
+}
+
+.risk-down {
+  color: #157347;
+}
+
+.professional-clinical-box {
+  background: #f7f9fc;
+  border: 1px solid #d9e2ec;
+  border-radius: 14px;
+  padding: 22px;
+}
+
+.professional-clinical-box h3 {
+  margin-bottom: 14px;
+  color: #12355b;
+  font-size: 1.55rem;
+  font-weight: 700;
+}
+
+.clinical-summary-text {
+  margin-bottom: 14px;
+  color: #334e68;
+  line-height: 1.7;
+  font-size: 1rem;
+}
+
+.clinical-factor-list {
+  margin: 0 0 16px 0;
+  padding-left: 22px;
+}
+
+.clinical-factor-list li {
+  margin-bottom: 12px;
+  line-height: 1.6;
+}
+
+.clinical-factor-text {
+  margin-top: 4px;
+  color: #475569;
+  font-size: 0.98rem;
+}
+
+.clinical-conclusion {
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px solid #dbe7f3;
+  color: #1e3a5f;
+  font-weight: 500;
+  line-height: 1.7;
+}
+
+.risk-up {
+  color: #b42318;
+}
+
+.risk-down {
+  color: #157347;
+}
+
+.professional-clinical-box {
+  background: #f7f9fc;
+  border: 1px solid #d9e2ec;
+  border-radius: 14px;
+  padding: 22px;
+}
+
+.professional-clinical-box h3,
+.contrib-section h4,
+.waterfall-section h4 {
+  margin-bottom: 14px;
+  color: #12355b;
+  font-size: 1.4rem;
+  font-weight: 700;
+}
+
+.clinical-summary-text {
+  margin-bottom: 14px;
+  color: #334e68;
+  line-height: 1.7;
+  font-size: 1rem;
+}
+
+.clinical-factor-list {
+  margin: 0 0 16px 0;
+  padding-left: 22px;
+}
+
+.clinical-factor-list li {
+  margin-bottom: 12px;
+  line-height: 1.6;
+}
+
+.clinical-factor-text {
+  margin-top: 4px;
+  color: #475569;
+  font-size: 0.98rem;
+}
+
+.clinical-conclusion {
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px solid #dbe7f3;
+  color: #1e3a5f;
+  font-weight: 500;
+  line-height: 1.7;
+  margin-bottom: 22px;
+}
+
+.risk-up {
+  color: #b42318;
+}
+
+.risk-down {
+  color: #157347;
+}
+
+.contrib-section {
+  margin-top: 22px;
+  padding-top: 18px;
+  border-top: 1px solid #dbe7f3;
+}
+
+.contrib-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.contrib-row {
+  display: grid;
+  grid-template-columns: 220px 1fr 90px;
+  gap: 12px;
+  align-items: center;
+}
+
+.contrib-label {
+  font-weight: 600;
+  color: #243b53;
+}
+
+.contrib-bar-wrap {
+  background: #e5eaf1;
+  border-radius: 999px;
+  height: 14px;
+  overflow: hidden;
+}
+
+.contrib-bar {
+  height: 100%;
+  border-radius: 999px;
+}
+
+.contrib-up {
+  background: linear-gradient(90deg, #f97066, #d92d20);
+}
+
+.contrib-down {
+  background: linear-gradient(90deg, #32d583, #12b76a);
+}
+
+.contrib-value {
+  text-align: right;
+  font-weight: 600;
+  color: #344054;
+}
+
+.waterfall-section {
+  margin-top: 24px;
+  padding-top: 18px;
+  border-top: 1px solid #dbe7f3;
+}
+
+.waterfall-base,
+.waterfall-final {
+  margin-bottom: 12px;
+  color: #243b53;
+}
+
+.waterfall-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.waterfall-row {
+  display: grid;
+  grid-template-columns: 220px 100px 1fr;
+  gap: 12px;
+  align-items: center;
+  padding: 10px 12px;
+  background: #ffffff;
+  border: 1px solid #e4e7ec;
+  border-radius: 10px;
+}
+
+.waterfall-feature {
+  font-weight: 600;
+  color: #243b53;
+}
+
+.waterfall-shift {
+  font-weight: 700;
+}
+
+.wf-up {
+  color: #d92d20;
+}
+
+.wf-down {
+  color: #12b76a;
+}
+
+.waterfall-range {
+  color: #475467;
+}
+
+@media (max-width: 900px) {
+  .contrib-row,
+  .waterfall-row {
+    grid-template-columns: 1fr;
+  }
+
+  .contrib-value {
+    text-align: left;
+  }
+}

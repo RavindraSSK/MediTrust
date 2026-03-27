@@ -16,133 +16,76 @@ function getClinicalFeatureLabel(feature) {
     slope: "ST-segment slope",
     sex: "sex"
   };
-
   return labels[feature] || feature;
 }
 
-function getClinicalNarrative(item) {
-  const feature = item.feature;
-  const value = item.value;
-  const direction = item.direction;
+function renderContributionBars(features) {
+  if (!features || !features.length) return "";
 
-  if (feature === "chol") {
-    if (value >= 240) {
-      return `Total cholesterol is ${value} mg/dL, which falls in the high range and is clinically associated with increased cardiovascular risk.`;
-    }
-    if (value >= 200) {
-      return `Total cholesterol is ${value} mg/dL, which falls in the borderline-high range and may contribute to increased cardiovascular risk.`;
-    }
-    return `Total cholesterol is ${value} mg/dL, which is within the desirable range and is less likely to be contributing substantially to risk.`;
-  }
+  const maxAbs = Math.max(...features.map((item) => Math.abs(item.impact)), 0.0001);
 
-  if (feature === "trestbps") {
-    if (value >= 140) {
-      return `Resting blood pressure is ${value} mmHg, which is in the stage 2 hypertension range and is an important cardiovascular risk factor.`;
-    }
-    if (value >= 130) {
-      return `Resting blood pressure is ${value} mmHg, which is in the stage 1 hypertension range and may contribute to cardiovascular risk.`;
-    }
-    if (value >= 120) {
-      return `Resting blood pressure is ${value} mmHg, which is elevated above the normal range and may modestly affect cardiovascular risk.`;
-    }
-    return `Resting blood pressure is ${value} mmHg, which is within the normal adult range.`;
-  }
+  return `
+    <div class="contrib-section">
+      <h4>Model Contribution Bars</h4>
+      <div class="contrib-list">
+        ${features
+          .map((item) => {
+            const pct = Math.max(8, Math.round((Math.abs(item.impact) / maxAbs) * 100));
+            const cls = item.direction === "increases risk" ? "contrib-up" : "contrib-down";
 
-  if (feature === "oldpeak") {
-    if (value >= 1) {
-      return `Exercise-induced ST depression is ${value}, which is above the commonly used abnormal threshold in stress testing and may suggest ischemic change.`;
-    }
-    return `Exercise-induced ST depression is ${value}, which is not markedly abnormal by common exercise ECG thresholds.`;
-  }
-
-  if (feature === "exang") {
-    return Number(value) === 1
-      ? "Exercise-induced angina is present, which is a clinically important indicator of exertional cardiac stress."
-      : "Exercise-induced angina is not present, which reduces concern from this specific indicator.";
-  }
-
-  if (feature === "ca") {
-    return Number(value) > 0
-      ? `Major vessel involvement is recorded as ${value}, and higher values generally support greater coronary disease burden in the model context.`
-      : "No major vessel involvement is recorded in this field, which is favorable in the model context.";
-  }
-
-  if (feature === "thal") {
-    return `The thallium stress test result is recorded as ${value}, and this feature is being used by the model as a meaningful indicator in the current prediction.`;
-  }
-
-  if (feature === "cp") {
-    return `The chest pain category is recorded as ${value}, and chest pain pattern is one of the clinically relevant inputs for cardiovascular risk interpretation.`;
-  }
-
-  if (feature === "restecg") {
-    return `The resting ECG category is recorded as ${value}, and resting ECG findings are contributing to the model's assessment.`;
-  }
-
-  if (feature === "thalach") {
-    return direction === "decreases risk"
-      ? `Maximum heart rate achieved is ${value}, and in this prediction it is acting as a risk-lowering signal within the model.`
-      : `Maximum heart rate achieved is ${value}, and in this prediction it is acting as a risk-increasing signal within the model.`;
-  }
-
-  if (feature === "age") {
-    return `Age is ${value}, and age is being considered by the model as part of the overall cardiovascular risk profile.`;
-  }
-
-  if (feature === "fbs") {
-    return Number(value) === 1
-      ? "Fasting blood sugar is flagged as elevated in this input, which may contribute additional metabolic risk."
-      : "Fasting blood sugar is not flagged as elevated in this input.";
-  }
-
-  if (feature === "slope") {
-    return `The ST-segment slope category is recorded as ${value}, and this parameter is contributing to the model's interpretation of exercise ECG behavior.`;
-  }
-
-  if (feature === "sex") {
-    return `Sex is included as one of the model inputs for cardiovascular risk estimation.`;
-  }
-
-  return `${getClinicalFeatureLabel(feature)} is contributing to the current prediction.`;
+            return `
+              <div class="contrib-row">
+                <div class="contrib-label">${getClinicalFeatureLabel(item.feature)}</div>
+                <div class="contrib-bar-wrap">
+                  <div class="contrib-bar ${cls}" style="width:${pct}%"></div>
+                </div>
+                <div class="contrib-value">${item.impact.toFixed(3)}</div>
+              </div>
+            `;
+          })
+          .join("")}
+      </div>
+    </div>
+  `;
 }
 
-function buildMainNarrative(riskLevel, topFeatures) {
-  if (!topFeatures.length) {
-    return "The prediction is based on the combination of the submitted clinical indicators. No specific feature-level explanation is available for this result.";
-  }
+function renderWaterfall(baseValue, finalProbability, features) {
+  if (!features || !features.length) return "";
 
-  const increasing = topFeatures.filter(
-    (item) => item.direction === "increases risk"
-  );
-  const decreasing = topFeatures.filter(
-    (item) => item.direction === "decreases risk"
-  );
+  let running = baseValue;
 
-  const incLabels = increasing.map((item) => getClinicalFeatureLabel(item.feature));
-  const decLabels = decreasing.map((item) => getClinicalFeatureLabel(item.feature));
+  const rows = features.map((item) => {
+    const before = running;
+    running += item.impact;
+    const after = running;
 
-  const joinLabels = (items) => {
-    if (items.length === 0) return "";
-    if (items.length === 1) return items[0];
-    if (items.length === 2) return `${items[0]} and ${items[1]}`;
-    return `${items.slice(0, -1).join(", ")}, and ${items[items.length - 1]}`;
-  };
+    return `
+      <div class="waterfall-row">
+        <div class="waterfall-feature">${getClinicalFeatureLabel(item.feature)}</div>
+        <div class="waterfall-shift ${item.direction === "increases risk" ? "wf-up" : "wf-down"}">
+          ${item.impact >= 0 ? "+" : ""}${item.impact.toFixed(3)}
+        </div>
+        <div class="waterfall-range">
+          ${before.toFixed(3)} → ${after.toFixed(3)}
+        </div>
+      </div>
+    `;
+  });
 
-  if (incLabels.length && decLabels.length) {
-    return `The model indicates that ${joinLabels(incLabels)} are the primary factors increasing the estimated cardiovascular risk, while ${joinLabels(decLabels)} appear to offset the prediction to some extent.`;
-  }
-
-  if (incLabels.length) {
-    return `The model indicates that ${joinLabels(incLabels)} are the primary factors increasing the estimated cardiovascular risk.`;
-  }
-
-  return `The model indicates that ${joinLabels(decLabels)} are the primary factors associated with a lower estimated cardiovascular risk.`;
-}
-
-function buildClinicalSummary(riskLevel) {
-  const normalized = (riskLevel || "current").toLowerCase();
-
-  return `Clinical Summary: Overall, the current pattern is most consistent with a ${normalized} predicted risk profile. This explanation is intended as decision support and should be interpreted together with symptoms, examination findings, and clinician judgement.`;
+  return `
+    <div class="waterfall-section">
+      <h4>SHAP Waterfall View</h4>
+      <div class="waterfall-base">
+        <strong>Base value:</strong> ${baseValue.toFixed(3)}
+      </div>
+      <div class="waterfall-list">
+        ${rows.join("")}
+      </div>
+      <div class="waterfall-final">
+        <strong>Final predicted probability:</strong> ${finalProbability.toFixed(3)}
+      </div>
+    </div>
+  `;
 }
 
 export function renderRiskResult(data) {
@@ -191,7 +134,9 @@ export function renderRiskResult(data) {
   }
 
   if (explanationSec) {
-    const topFeatures = (data.top_features || []).slice(0, 3);
+    const topFeatures = data.top_features || [];
+    const allFeatures = data.all_features || [];
+    const baseValue = safeNumber(data.base_value) ?? 0;
 
     const factorListHtml = topFeatures
       .map((item) => {
@@ -201,26 +146,38 @@ export function renderRiskResult(data) {
         return `
           <li class="${toneClass}">
             <strong>${getClinicalFeatureLabel(item.feature)}</strong>
-            <div class="clinical-factor-text">${getClinicalNarrative(item)}</div>
+            <div class="clinical-factor-text">
+              ${getClinicalFeatureLabel(item.feature)} contributed ${item.direction === "increases risk" ? "to a higher" : "to a lower"} estimated risk
+              (observed value: ${item.value}, SHAP impact: ${item.impact.toFixed(3)})
+            </div>
           </li>
         `;
       })
       .join("");
 
-    const mainNarrative = buildMainNarrative(riskLevel, topFeatures);
-    const summarySentence = buildClinicalSummary(riskLevel);
+    const barsHtml = renderContributionBars(allFeatures.slice(0, 8));
+    const waterfallHtml = renderWaterfall(baseValue, score || 0, allFeatures.slice(0, 8));
 
     explanationSec.innerHTML = `
       <div class="risk-fluid">
         <div class="explain-box professional-clinical-box">
           <h3>AI Clinical Explanation</h3>
-          <p class="clinical-summary-text">${mainNarrative}</p>
+          <p class="clinical-summary-text">
+            ${data.explanation_summary || "No detailed explanation is available for this prediction."}
+          </p>
+
           ${
             factorListHtml
               ? `<ul class="clinical-factor-list">${factorListHtml}</ul>`
               : `<p class="hint">Detailed feature contributions are not available for this prediction.</p>`
           }
-          <p class="clinical-conclusion">${summarySentence}</p>
+
+          <p class="clinical-conclusion">
+            Clinical Summary: Overall, the current pattern should be interpreted together with symptoms, examination findings, and clinician judgement.
+          </p>
+
+          ${barsHtml}
+          ${waterfallHtml}
         </div>
       </div>
     `;

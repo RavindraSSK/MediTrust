@@ -58,3 +58,5 @@ class PredictResponse(BaseModel):
     triage_recommendation: str
     explanation_summary: str
     top_features: List[FeatureExplanation]
+    all_features: List[FeatureExplanation]
+    base_value: float

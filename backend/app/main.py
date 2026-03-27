@@ -16,16 +16,14 @@ from .schemas import (
     PredictRequest,
     PredictResponse,
 )
-from .ml_service import predict_probability
+from .ml_service import predict_probability, explain_prediction
 from .risk import risk_level_from_probability
 
 
 app = FastAPI(title="MediTrust API", version="0.1")
 
-# Password hashing setup
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
-# CORS Configuration
 ALLOWED_ORIGINS = [
     "http://127.0.0.1:5500",
     "http://localhost:5500",
@@ -48,82 +46,7 @@ app.add_middleware(
 def on_startup():
     Base.metadata.create_all(bind=engine)
 
-# Helper Function for Explainability
 
-def build_basic_explanation(payload: dict):
-    explanations = []
-
-    if payload["age"] >= 50:
-        explanations.append({
-            "feature": "age",
-            "value": float(payload["age"]),
-            "impact": 0.12,
-            "direction": "increases risk"
-        })
-
-    if payload["chol"] >= 240:
-        explanations.append({
-            "feature": "chol",
-            "value": float(payload["chol"]),
-            "impact": 0.10,
-            "direction": "increases risk"
-        })
-
-    if payload["oldpeak"] >= 2:
-        explanations.append({
-            "feature": "oldpeak",
-            "value": float(payload["oldpeak"]),
-            "impact": 0.08,
-            "direction": "increases risk"
-        })
-
-    if payload["exang"] == 1:
-        explanations.append({
-            "feature": "exang",
-            "value": float(payload["exang"]),
-            "impact": 0.07,
-            "direction": "increases risk"
-        })
-
-    if payload["ca"] >= 1:
-        explanations.append({
-            "feature": "ca",
-            "value": float(payload["ca"]),
-            "impact": 0.09,
-            "direction": "increases risk"
-        })
-
-    if payload["thalach"] >= 150:
-        explanations.append({
-            "feature": "thalach",
-            "value": float(payload["thalach"]),
-            "impact": -0.06,
-            "direction": "decreases risk"
-        })
-
-    if not explanations:
-        explanations.append({
-            "feature": "overall_profile",
-            "value": 0.0,
-            "impact": 0.0,
-            "direction": "neutral impact"
-        })
-
-    explanations = sorted(
-        explanations,
-        key=lambda item: abs(item["impact"]),
-        reverse=True
-    )[:3]
-
-    feature_names = ", ".join([item["feature"] for item in explanations])
-    summary = f"Top contributing factors for this prediction are: {feature_names}."
-
-    return explanations, summary
-
-
-# --------------------------------------------------
-# Basic Routes
-# --------------------------------------------------
 @app.get("/")
 def root():
     return {
@@ -142,12 +65,9 @@ def health():
 @app.get("/db-health")
 def db_health(db: Session = Depends(get_db)):
     db.execute(text("SELECT 1"))
-    return {"database": "PostgreSQL connected ✅"}
+    return {"database": "PostgreSQL connected "}
 
 
-# --------------------------------------------------
-# AUTH ROUTES
-# --------------------------------------------------
 @app.post("/auth/register", response_model=AuthOut)
 def register(data: RegisterIn, db: Session = Depends(get_db)):
     if len(data.password.encode("utf-8")) > 72:
@@ -182,9 +102,6 @@ def login(data: LoginIn, db: Session = Depends(get_db)):
     return {"ok": True, "message": "Login successful."}
 
 
-# --------------------------------------------------
-# RISK ASSESSMENT ROUTE
-# --------------------------------------------------
 @app.post("/assess", response_model=AssessmentOut)
 def assess(data: AssessmentIn, db: Session = Depends(get_db)):
     if data.age >= 50:
@@ -212,9 +129,6 @@ def assess(data: AssessmentIn, db: Session = Depends(get_db)):
     )
 
 
-# --------------------------------------------------
-# ML PREDICTION ROUTE
-# --------------------------------------------------
 @app.post("/predict", response_model=PredictResponse, tags=["Prediction"])
 def predict(req: PredictRequest, db: Session = Depends(get_db)):
     payload = req.model_dump()
@@ -222,9 +136,8 @@ def predict(req: PredictRequest, db: Session = Depends(get_db)):
     prob = float(predict_probability(payload))
     level, msg = risk_level_from_probability(prob)
 
-    top_features, explanation_summary = build_basic_explanation(payload)
+    top_features, all_features, base_value, explanation_summary = explain_prediction(payload, level)
 
-    # Save prediction log
     log = models.PredictionLog(
         **payload,
         risk_probability=prob,
@@ -239,7 +152,9 @@ def predict(req: PredictRequest, db: Session = Depends(get_db)):
         risk_level=level,
         triage_recommendation=msg,
         explanation_summary=explanation_summary,
-        top_features=top_features
+        top_features=top_features,
+        all_features=all_features,
+        base_value=base_value
     )
 
 
