@@ -29,7 +29,6 @@ body {
     text-align: center;
 }
 
-/* Headings */
 .login-card h1 {
     font-weight: 600;
     margin-bottom: 8px;
@@ -40,7 +39,6 @@ body {
     margin-bottom: 25px;
 }
 
-/* Input with icon */
 .input-icon {
     position: relative;
     margin-bottom: 18px;
@@ -67,13 +65,11 @@ body {
     border-color: #667eea;
 }
 
-/* Row for first & last name */
 .row {
     display: flex;
     gap: 10px;
 }
 
-/* Button */
 button {
     width: 100%;
     padding: 12px;
@@ -92,7 +88,6 @@ button:hover {
     opacity: 0.95;
 }
 
-/* Footer */
 .footer-text {
     margin-top: 18px;
     font-size: 14px;
