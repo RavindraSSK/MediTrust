@@ -18,6 +18,7 @@ from .schemas import (
 )
 from .ml_service import predict_probability, explain_prediction
 from .risk import risk_level_from_probability
+from .auth import router as auth_extra_router
 
 
 app = FastAPI(title="MediTrust API", version="0.1")
@@ -40,6 +41,8 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+app.include_router(auth_extra_router)
 
 
 @app.on_event("startup")
@@ -65,7 +68,7 @@ def health():
 @app.get("/db-health")
 def db_health(db: Session = Depends(get_db)):
     db.execute(text("SELECT 1"))
-    return {"database": "PostgreSQL connected "}
+    return {"database": "PostgreSQL connected"}
 
 
 @app.post("/auth/register", response_model=AuthOut)
@@ -82,13 +85,16 @@ def register(data: RegisterIn, db: Session = Depends(get_db)):
         full_name=data.full_name.strip(),
         email=email,
         password_hash=pwd_context.hash(data.password),
+        role=data.role or "Doctor",
+        hospital_name=data.hospital_name,
     )
     db.add(user)
     db.commit()
+
     return {"ok": True, "message": "Account created successfully."}
 
 
-@app.post("/auth/login", response_model=AuthOut)
+@app.post("/auth/login")
 def login(data: LoginIn, db: Session = Depends(get_db)):
     email = data.email.lower().strip()
 
@@ -99,7 +105,13 @@ def login(data: LoginIn, db: Session = Depends(get_db)):
     if not pwd_context.verify(data.password, user.password_hash):
         return {"ok": False, "message": "Invalid email or password."}
 
-    return {"ok": True, "message": "Login successful."}
+    return {
+        "ok": True,
+        "message": "Login successful.",
+        "email": user.email,
+        "full_name": user.full_name,
+        "role": user.role,
+    }
 
 
 @app.post("/assess", response_model=AssessmentOut)
@@ -172,7 +184,64 @@ def recent_predictions(db: Session = Depends(get_db)):
             "id": r.id,
             "risk_probability": r.risk_probability,
             "risk_level": r.risk_level,
+            "age": r.age,
+            "trestbps": r.trestbps,
+            "chol": r.chol,
             "created_at": r.created_at
         }
         for r in rows
     ]
+
+
+@app.get("/predictions/urgent", tags=["Prediction"])
+def urgent_predictions(db: Session = Depends(get_db)):
+    rows = (
+        db.query(models.PredictionLog)
+        .filter(models.PredictionLog.risk_level == "High")
+        .order_by(models.PredictionLog.id.desc())
+        .limit(10)
+        .all()
+    )
+
+    return [
+        {
+            "id": r.id,
+            "risk_probability": r.risk_probability,
+            "risk_level": r.risk_level,
+            "age": r.age,
+            "trestbps": r.trestbps,
+            "chol": r.chol,
+            "created_at": r.created_at,
+            "triage_message": "Immediate physician evaluation recommended"
+        }
+        for r in rows
+    ]
+
+
+@app.get("/dashboard/summary", tags=["Dashboard"])
+def dashboard_summary(db: Session = Depends(get_db)):
+    total_predictions = db.query(models.PredictionLog).count()
+    urgent_cases = (
+        db.query(models.PredictionLog)
+        .filter(models.PredictionLog.risk_level == "High")
+        .count()
+    )
+    medium_cases = (
+        db.query(models.PredictionLog)
+        .filter(models.PredictionLog.risk_level == "Medium")
+        .count()
+    )
+    low_cases = (
+        db.query(models.PredictionLog)
+        .filter(models.PredictionLog.risk_level == "Low")
+        .count()
+    )
+    total_users = db.query(User).count()
+
+    return {
+        "total_predictions": total_predictions,
+        "urgent_cases": urgent_cases,
+        "medium_cases": medium_cases,
+        "low_cases": low_cases,
+        "total_users": total_users,
+    }

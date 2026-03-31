@@ -1,4 +1,5 @@
-from sqlalchemy import Column, Integer, String, Float
+from sqlalchemy import Column, Integer, Float, String, DateTime
+from sqlalchemy.sql import func
 from .db import Base
 
 
@@ -12,7 +13,6 @@ class Assessment(Base):
     risk_score = Column(Float, nullable=False)
 
 
-
 class User(Base):
     __tablename__ = "users"
 
@@ -20,10 +20,8 @@ class User(Base):
     full_name = Column(String, nullable=False)
     email = Column(String, unique=True, index=True, nullable=False)
     password_hash = Column(String, nullable=False)
-
-from sqlalchemy import Column, Integer, Float, String, DateTime
-from sqlalchemy.sql import func
-from .db import Base
+    role = Column(String, nullable=False, default="Doctor")
+    hospital_name = Column(String, nullable=True)
 
 
 class PredictionLog(Base):
@@ -31,7 +29,6 @@ class PredictionLog(Base):
 
     id = Column(Integer, primary_key=True, index=True)
 
-    # input features
     age = Column(Float)
     sex = Column(Integer)
     cp = Column(Integer)
@@ -46,7 +43,6 @@ class PredictionLog(Base):
     ca = Column(Integer)
     thal = Column(Integer)
 
-    # model output
     risk_probability = Column(Float)
     risk_level = Column(String)
 

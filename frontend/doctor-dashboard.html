@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>MediTrust | Doctor Dashboard</title>
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body class="dashboard-page">
+  <div class="page-bg"></div>
+  <div class="page-overlay"></div>
+
+  <main class="dashboard-shell">
+    <section class="dashboard-card">
+      <header class="dashboard-header">
+        <div>
+          <h1 class="dashboard-title">Doctor Dashboard</h1>
+          <p class="dashboard-subtitle">Full clinical review and urgent case visibility</p>
+        </div>
+        <div class="dashboard-user-box">
+          <span id="doctorUserName">Loading...</span>
+          <button id="logoutBtn" class="mini-btn">Logout</button>
+        </div>
+      </header>
+
+      <section class="stats-grid">
+        <div class="stat-box">
+          <h3>Urgent Cases</h3>
+          <p id="doctorUrgentCount">0</p>
+        </div>
+        <div class="stat-box">
+          <h3>Total Predictions</h3>
+          <p id="doctorTotalPredictions">0</p>
+        </div>
+        <div class="stat-box">
+          <h3>Medium Risk</h3>
+          <p id="doctorMediumCount">0</p>
+        </div>
+      </section>
+
+      <section class="dashboard-grid">
+        <div class="panel-box">
+          <h2>Quick Actions</h2>
+          <div class="action-list">
+            <a href="meditrust.html" class="action-btn">Open Patient Assessment</a>
+            <button class="action-btn action-btn-secondary" type="button">View Explainability Insights</button>
+          </div>
+        </div>
+
+        <div class="panel-box">
+          <h2>Urgent Clinical Alerts</h2>
+          <ul class="alert-list" id="doctorUrgentList">
+            <li><span>Loading urgent cases...</span></li>
+          </ul>
+        </div>
+      </section>
+
+      <section class="panel-box wide-panel">
+        <h2>Recent Urgent Case Details</h2>
+        <div id="doctorCaseDetails" class="doctor-case-details">
+          <div class="scope-item">Select or review urgent cases from the alert list above.</div>
+        </div>
+      </section>
+    </section>
+  </main>
+
+  <script type="module">
+    import {
+      getCurrentUser,
+      attachLogout,
+      fetchUrgentCases,
+      fetchDashboardSummary,
+      formatRiskPercent,
+      formatDateTime,
+      buildDoctorAlertMessage
+    } from "./js/dashboard.js";
+
+    const user = getCurrentUser("Doctor");
+    if (!user) throw new Error("Unauthorized");
+
+    document.getElementById("doctorUserName").textContent =
+      user.full_name ? `Dr. ${user.full_name}` : "Doctor";
+
+    attachLogout();
+
+    function renderCaseDetails(item) {
+      const details = document.getElementById("doctorCaseDetails");
+      if (!details) return;
+
+      if (!item) {
+        details.innerHTML = `<div class="scope-item">No urgent case selected.</div>`;
+        return;
+      }
+
+      details.innerHTML = `
+        <div class="case-detail-grid">
+          <div class="case-detail-card">
+            <h4>Prediction ID</h4>
+            <p>#${item.id}</p>
+          </div>
+          <div class="case-detail-card">
+            <h4>Risk Level</h4>
+            <p>${item.risk_level}</p>
+          </div>
+          <div class="case-detail-card">
+            <h4>Risk Probability</h4>
+            <p>${formatRiskPercent(item.risk_probability)}</p>
+          </div>
+          <div class="case-detail-card">
+            <h4>Age</h4>
+            <p>${item.age}</p>
+          </div>
+          <div class="case-detail-card">
+            <h4>Resting BP</h4>
+            <p>${item.trestbps} mmHg</p>
+          </div>
+          <div class="case-detail-card">
+            <h4>Cholesterol</h4>
+            <p>${item.chol} mg/dL</p>
+          </div>
+        </div>
+        <div class="doctor-note-box">
+          <strong>Triage Message:</strong> ${buildDoctorAlertMessage(item)}
+        </div>
+        <div class="doctor-note-box secondary-note">
+          <strong>Logged:</strong> ${formatDateTime(item.created_at)}
+        </div>
+      `;
+    }
+
+    async function loadDoctorDashboard() {
+      try {
+        const summary = await fetchDashboardSummary();
+        document.getElementById("doctorUrgentCount").textContent = summary.urgent_cases ?? 0;
+        document.getElementById("doctorTotalPredictions").textContent = summary.total_predictions ?? 0;
+        document.getElementById("doctorMediumCount").textContent = summary.medium_cases ?? 0;
+
+        const urgentCases = await fetchUrgentCases();
+        const list = document.getElementById("doctorUrgentList");
+
+        if (!urgentCases.length) {
+          list.innerHTML = `<li><span>No urgent high-risk cases right now.</span></li>`;
+          renderCaseDetails(null);
+          return;
+        }
+
+        list.innerHTML = urgentCases.map((item, index) => `
+          <li class="doctor-alert-item" data-index="${index}">
+            <strong>Prediction #${item.id} • ${item.risk_level}</strong>
+            <span>
+              Risk: ${formatRiskPercent(item.risk_probability)} •
+              Age: ${item.age} •
+              BP: ${item.trestbps} •
+              Chol: ${item.chol} •
+              ${buildDoctorAlertMessage(item)}
+            </span>
+          </li>
+        `).join("");
+
+        renderCaseDetails(urgentCases[0]);
+
+        document.querySelectorAll(".doctor-alert-item").forEach((node) => {
+          node.addEventListener("click", () => {
+            const index = Number(node.dataset.index);
+            renderCaseDetails(urgentCases[index]);
+          });
+        });
+      } catch (error) {
+        document.getElementById("doctorUrgentList").innerHTML =
+          `<li><span>Unable to load urgent cases.</span></li>`;
+      }
+    }
+
+    loadDoctorDashboard();
+  </script>
+</body>
+</html>

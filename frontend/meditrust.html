@@ -21,6 +21,11 @@
             This is a preliminary assessment and does not replace clinical judgement.
           </div>
 
+          <div class="session-strip">
+            <span id="currentUserRole" class="session-pill">Clinician</span>
+            <span id="currentUserName" class="session-user">Signed in user</span>
+          </div>
+
           <div class="actions">
             <button id="logoutBtn" class="btn-secondary" type="button">Logout</button>
           </div>
@@ -206,6 +211,12 @@
           </div>
 
           <div id="note" class="risk-note"></div>
+
+          <div id="workflowNotice" class="workflow-notice" style="display:none;"></div>
+
+          <div class="result-actions">
+            <a id="returnDashboardBtn" class="btn-secondary result-link-btn" href="#">Return to Dashboard</a>
+          </div>
         </div>
       </div>
 

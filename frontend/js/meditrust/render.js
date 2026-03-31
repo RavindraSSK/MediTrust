@@ -88,6 +88,56 @@ function renderWaterfall(baseValue, finalProbability, features) {
   `;
 }
 
+function renderWorkflowNotice(data) {
+  const workflowNoticeEl = pickId("workflowNotice");
+  if (!workflowNoticeEl) return;
+
+  const role = data.current_role || "Clinician";
+  const riskLevel = data.risk_level || "-";
+
+  let html = "";
+
+  if (role === "Nurse" && riskLevel === "High") {
+    html = `
+      <div class="workflow-banner workflow-high">
+        <strong>High Risk Detected:</strong>
+        Doctor has been notified for immediate review. Prepare the patient for urgent physician evaluation.
+      </div>
+    `;
+  } else if (role === "Nurse" && riskLevel === "Medium") {
+    html = `
+      <div class="workflow-banner workflow-medium">
+        <strong>Priority Review:</strong>
+        This case should remain in the clinical review queue for timely physician assessment.
+      </div>
+    `;
+  } else if (role === "Doctor") {
+    html = `
+      <div class="workflow-banner workflow-doctor">
+        <strong>Doctor Review Mode:</strong>
+        Use this prediction together with clinical examination, symptoms, and professional judgement before final action.
+      </div>
+    `;
+  } else if (role === "Admin") {
+    html = `
+      <div class="workflow-banner workflow-admin">
+        <strong>Administrative View:</strong>
+        Prediction results are visible for workflow monitoring and system oversight.
+      </div>
+    `;
+  } else {
+    html = `
+      <div class="workflow-banner">
+        <strong>Clinical Workflow:</strong>
+        This result should be interpreted within the care workflow and does not replace clinician judgement.
+      </div>
+    `;
+  }
+
+  workflowNoticeEl.innerHTML = html;
+  show(workflowNoticeEl, true);
+}
+
 export function renderRiskResult(data) {
   const riskLevelEl = pickId("riskLevel");
   const riskScoreEl = pickId("riskScore");
@@ -132,6 +182,8 @@ export function renderRiskResult(data) {
     const pct = Math.min(100, Math.max(0, Math.round(score * 100)));
     barEl.style.width = `${pct}%`;
   }
+
+  renderWorkflowNotice(data);
 
   if (explanationSec) {
     const topFeatures = data.top_features || [];
@@ -208,4 +260,10 @@ export function clearError() {
   if (!errEl) return;
   errEl.textContent = "";
   show(errEl, false);
+
+  const workflowNoticeEl = pickId("workflowNotice");
+  if (workflowNoticeEl) {
+    workflowNoticeEl.innerHTML = "";
+    show(workflowNoticeEl, false);
+  }
 }

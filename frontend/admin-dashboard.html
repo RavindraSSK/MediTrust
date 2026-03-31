@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>MediTrust | Admin Dashboard</title>
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body class="dashboard-page">
+  <div class="page-bg"></div>
+  <div class="page-overlay"></div>
+
+  <main class="dashboard-shell">
+    <section class="dashboard-card">
+      <header class="dashboard-header">
+        <div>
+          <h1 class="dashboard-title">Admin Dashboard</h1>
+          <p class="dashboard-subtitle">System monitoring and recent prediction activity</p>
+        </div>
+        <div class="dashboard-user-box">
+          <span id="adminUserName">Loading...</span>
+          <button id="logoutBtn" class="mini-btn">Logout</button>
+        </div>
+      </header>
+
+      <section class="stats-grid">
+        <div class="stat-box">
+          <h3>Total Users</h3>
+          <p id="adminTotalUsers">0</p>
+        </div>
+        <div class="stat-box">
+          <h3>Total Predictions</h3>
+          <p id="adminTotalPredictions">0</p>
+        </div>
+        <div class="stat-box">
+          <h3>Urgent Cases</h3>
+          <p id="adminUrgentCount">0</p>
+        </div>
+      </section>
+
+      <section class="dashboard-grid">
+        <div class="panel-box">
+          <h2>Admin Actions</h2>
+          <div class="action-list">
+            <button class="action-btn" type="button">Manage Users</button>
+            <button class="action-btn action-btn-secondary" type="button">View Prediction Logs</button>
+            <button class="action-btn action-btn-secondary" type="button">Monitor Activity</button>
+          </div>
+        </div>
+
+        <div class="panel-box">
+          <h2>Recent Predictions</h2>
+          <ul class="alert-list" id="adminRecentList">
+            <li><span>Loading recent predictions...</span></li>
+          </ul>
+        </div>
+      </section>
+    </section>
+  </main>
+
+  <script type="module">
+    import {
+      getCurrentUser,
+      attachLogout,
+      fetchRecentPredictions,
+      fetchDashboardSummary,
+      formatRiskPercent,
+      formatDateTime
+    } from "./js/dashboard.js";
+
+    const user = getCurrentUser("Admin");
+    if (!user) throw new Error("Unauthorized");
+
+    document.getElementById("adminUserName").textContent =
+      user.full_name ? user.full_name : "Admin";
+
+    attachLogout();
+
+    async function loadAdminDashboard() {
+      try {
+        const summary = await fetchDashboardSummary();
+        document.getElementById("adminTotalUsers").textContent = summary.total_users ?? 0;
+        document.getElementById("adminTotalPredictions").textContent = summary.total_predictions ?? 0;
+        document.getElementById("adminUrgentCount").textContent = summary.urgent_cases ?? 0;
+
+        const recent = await fetchRecentPredictions();
+        const list = document.getElementById("adminRecentList");
+
+        if (!recent.length) {
+          list.innerHTML = `<li><span>No recent predictions available.</span></li>`;
+          return;
+        }
+
+        list.innerHTML = recent.map(item => `
+          <li>
+            <strong>Prediction #${item.id} • ${item.risk_level}</strong>
+            <span>
+              Risk: ${formatRiskPercent(item.risk_probability)} •
+              Age: ${item.age} •
+              BP: ${item.trestbps} •
+              Chol: ${item.chol} •
+              ${formatDateTime(item.created_at)}
+            </span>
+          </li>
+        `).join("");
+      } catch (error) {
+        document.getElementById("adminRecentList").innerHTML =
+          `<li><span>Unable to load recent predictions.</span></li>`;
+      }
+    }
+
+    loadAdminDashboard();
+  </script>
+</body>
+</html>
