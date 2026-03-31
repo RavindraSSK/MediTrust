@@ -1,42 +1,71 @@
-import { $, go } from "../utils.js";
-import { PAGE_LOGIN } from "../config.js";
-import { registerUser } from "../services/api.js";
+import { renderPasswordRules } from "./password-rules.js";
+
+const API_BASE = "http://127.0.0.1:8000";
 
 export function initSignupPage() {
-  const form = $("signupForm");
-  if (!form) return;
+  const signupForm = document.getElementById("signupForm");
+  const signupMessage = document.getElementById("signupMessage");
+  const passwordInput = document.getElementById("password");
+  const rulesBox = document.getElementById("passwordRules");
 
-  form.addEventListener("submit", async (e) => {
+  if (!signupForm) return;
+
+  passwordInput?.addEventListener("input", () => {
+    renderPasswordRules(rulesBox, passwordInput.value);
+  });
+
+  signupForm.addEventListener("submit", async (e) => {
     e.preventDefault();
+    signupMessage.textContent = "";
 
-    const first = ($("firstName")?.value || "").trim();
-    const last = ($("lastName")?.value || "").trim();
-    const email = ($("email")?.value || "").trim();
-    const pass = ($("password")?.value || "").trim();
-    const conf = ($("confirmPassword")?.value || "").trim();
+    const fullName = document.getElementById("fullName").value.trim();
+    const email = document.getElementById("email").value.trim();
+    const role = document.getElementById("role").value.trim();
+    const hospitalName = document.getElementById("hospitalName").value.trim();
+    const password = document.getElementById("password").value.trim();
+    const confirmPassword = document.getElementById("confirmPassword").value.trim();
 
-    if (!first || !last || !email || !pass || !conf) {
-      alert("Please fill all fields.");
+    if (!fullName || !email || !role || !password || !confirmPassword) {
+      signupMessage.textContent = "Please complete all required fields.";
       return;
     }
 
-    if (pass !== conf) {
-      alert("Passwords do not match.");
+    if (password.length < 8) {
+      signupMessage.textContent = "Password must be at least 8 characters.";
+      return;
+    }
+
+    if (password !== confirmPassword) {
+      signupMessage.textContent = "Passwords do not match.";
       return;
     }
 
     try {
-      const out = await registerUser(`${first} ${last}`, email, pass);
+      const response = await fetch(`${API_BASE}/auth/register`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          full_name: fullName,
+          email,
+          password,
+          role,
+          hospital_name: hospitalName
+        })
+      });
 
-      if (!out.ok) {
-        alert(out.message);
+      const data = await response.json();
+
+      if (!data.ok) {
+        signupMessage.textContent = data.message || "Registration failed.";
         return;
       }
 
-      alert(out.message);
-      go(PAGE_LOGIN);
-    } catch (err) {
-      alert("Registration failed: " + (err?.message || err));
+      alert("Account created successfully. Please log in.");
+      window.location.href = "index.html";
+    } catch (error) {
+      signupMessage.textContent = "Unable to connect to the server. Please try again.";
     }
   });
 }
