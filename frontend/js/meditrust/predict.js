@@ -3,7 +3,7 @@ import { predictRisk, assessRisk } from "../services/api.js";
 import { renderError, clearError, renderRiskResult } from "./render.js";
 import { buildPredictPayload } from "./form.js";
 
-export async function handlePrediction(elements) {
+export async function handlePrediction(elements, currentUser = null) {
   clearError();
 
   const name = (elements.nameEl?.value || "").trim();
@@ -52,6 +52,8 @@ export async function handlePrediction(elements) {
       data = await assessRisk(name, age);
     }
 
+    data.patient_name = name;
+    data.current_role = currentUser?.role || "Clinician";
     renderRiskResult(data);
   } catch (err) {
     console.error(err);

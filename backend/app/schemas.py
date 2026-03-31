@@ -1,5 +1,5 @@
 from pydantic import BaseModel, EmailStr, Field
-from typing import List
+from typing import List, Optional
 
 
 class AssessmentIn(BaseModel):
@@ -17,6 +17,8 @@ class RegisterIn(BaseModel):
     full_name: str
     email: EmailStr
     password: str
+    role: Optional[str] = "Doctor"
+    hospital_name: Optional[str] = None
 
 
 class LoginIn(BaseModel):
@@ -27,6 +29,25 @@ class LoginIn(BaseModel):
 class AuthOut(BaseModel):
     ok: bool
     message: str
+
+
+class GenericMessageOut(BaseModel):
+    ok: bool
+    message: str
+
+
+class ForgotPasswordIn(BaseModel):
+    email: EmailStr
+
+
+class VerifyResetCodeIn(BaseModel):
+    email: EmailStr
+    code: str
+
+
+class ResetPasswordIn(BaseModel):
+    email: EmailStr
+    new_password: str
 
 
 class PredictRequest(BaseModel):

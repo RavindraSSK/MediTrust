@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>MediTrust | Nurse Dashboard</title>
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body class="dashboard-page">
+  <div class="page-bg"></div>
+  <div class="page-overlay"></div>
+
+  <main class="dashboard-shell">
+    <section class="dashboard-card">
+      <header class="dashboard-header">
+        <div>
+          <h1 class="dashboard-title">Nurse Dashboard</h1>
+          <p class="dashboard-subtitle">Triage workflow and escalation support</p>
+        </div>
+        <div class="dashboard-user-box">
+          <span id="nurseUserName">Loading...</span>
+          <button id="logoutBtn" class="mini-btn">Logout</button>
+        </div>
+      </header>
+
+      <section class="stats-grid">
+        <div class="stat-box">
+          <h3>Total Predictions</h3>
+          <p id="nurseTotalPredictions">0</p>
+        </div>
+        <div class="stat-box">
+          <h3>Urgent Escalations</h3>
+          <p id="nurseUrgentCount">0</p>
+        </div>
+        <div class="stat-box">
+          <h3>Low Risk Cases</h3>
+          <p id="nurseLowCount">0</p>
+        </div>
+      </section>
+
+      <section class="dashboard-grid">
+        <div class="panel-box">
+          <h2>Quick Actions</h2>
+          <div class="action-list">
+            <a href="meditrust.html" class="action-btn">Start New Patient Assessment</a>
+            <button class="action-btn action-btn-secondary" type="button">Review Triage Queue</button>
+            <button class="action-btn action-btn-secondary" type="button">Escalate High Risk Case</button>
+          </div>
+        </div>
+
+        <div class="panel-box">
+          <h2>Recent Triage Queue</h2>
+          <ul class="alert-list" id="nurseRecentList">
+            <li><span>Loading triage queue...</span></li>
+          </ul>
+        </div>
+      </section>
+
+      <section class="panel-box wide-panel">
+        <h2>Workflow Note</h2>
+        <div class="scope-grid">
+          <div class="scope-item">High-risk predictions are automatically stored in prediction logs.</div>
+          <div class="scope-item">Doctor dashboard reads urgent high-risk cases directly from those logs.</div>
+          <div class="scope-item">Use the patient assessment page to generate new triage predictions.</div>
+          <div class="scope-item">Urgent cases can be routed for immediate physician review.</div>
+        </div>
+      </section>
+    </section>
+  </main>
+
+  <script type="module">
+    import {
+      getCurrentUser,
+      attachLogout,
+      fetchRecentPredictions,
+      fetchDashboardSummary,
+      formatRiskPercent,
+      formatDateTime
+    } from "./js/dashboard.js";
+
+    const user = getCurrentUser("Nurse");
+    if (!user) throw new Error("Unauthorized");
+
+    document.getElementById("nurseUserName").textContent =
+      user.full_name ? user.full_name : "Nurse";
+
+    attachLogout();
+
+    async function loadNurseDashboard() {
+      try {
+        const summary = await fetchDashboardSummary();
+        document.getElementById("nurseTotalPredictions").textContent = summary.total_predictions ?? 0;
+        document.getElementById("nurseUrgentCount").textContent = summary.urgent_cases ?? 0;
+        document.getElementById("nurseLowCount").textContent = summary.low_cases ?? 0;
+
+        const recent = await fetchRecentPredictions();
+        const list = document.getElementById("nurseRecentList");
+
+        if (!recent.length) {
+          list.innerHTML = `<li><span>No triage results available yet.</span></li>`;
+          return;
+        }
+
+        list.innerHTML = recent.map(item => `
+          <li>
+            <strong>Prediction #${item.id} • ${item.risk_level}</strong>
+            <span>
+              Risk: ${formatRiskPercent(item.risk_probability)} •
+              Age: ${item.age} •
+              BP: ${item.trestbps} •
+              Chol: ${item.chol} •
+              ${formatDateTime(item.created_at)}
+            </span>
+          </li>
+        `).join("");
+      } catch (error) {
+        document.getElementById("nurseRecentList").innerHTML =
+          `<li><span>Unable to load triage queue.</span></li>`;
+      }
+    }
+
+    loadNurseDashboard();
+  </script>
+</body>
+</html>
