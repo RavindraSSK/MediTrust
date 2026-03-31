@@ -2,57 +2,90 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Create Account | MediTrust</title>
-
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>MediTrust | Create Clinician Account</title>
   <link rel="stylesheet" href="css/style.css" />
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
+</head>
+<body class="login-page">
+  <div class="page-bg"></div>
+  <div class="page-overlay"></div>
+
+  <main class="page-shell">
+    <section class="login-card">
+      <header class="login-header">
+        <h1 class="brand-title">MediTrust</h1>
+        <div class="header-divider"></div>
+        <h2 class="portal-title">Create Clinician Account</h2>
+        <p class="portal-subtitle">
+          Register as authorized healthcare personnel to access MediTrust.
+        </p>
+      </header>
+
+      <form id="signupForm" class="login-form" novalidate>
+        <div class="field">
+          <label for="fullName">Full Name</label>
+          <div class="input-wrap">
+            <input type="text" id="fullName" placeholder="Enter your full name" required />
+          </div>
+        </div>
+
+        <div class="field">
+          <label for="email">Work Email</label>
+          <div class="input-wrap">
+            <input type="email" id="email" placeholder="Enter your work email" required />
+          </div>
+        </div>
+
+        <div class="field">
+          <label for="role">Role</label>
+          <div class="input-wrap">
+            <select id="role" required class="role-select">
+              <option value="">Select role</option>
+              <option value="Doctor">Doctor</option>
+              <option value="Nurse">Nurse</option>
+              <option value="Admin">Admin</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="field">
+          <label for="hospitalName">Hospital / Clinic Name</label>
+          <div class="input-wrap">
+            <input type="text" id="hospitalName" placeholder="Enter hospital or clinic name" />
+          </div>
+        </div>
+
+        <div class="field">
+          <label for="password">Password</label>
+          <div class="input-wrap">
+            <input type="password" id="password" placeholder="Minimum 8 characters" required />
+          </div>
+          <div id="passwordRules" class="password-rules"></div>
+        </div>
+
+        <div class="field">
+          <label for="confirmPassword">Confirm Password</label>
+          <div class="input-wrap">
+            <input type="password" id="confirmPassword" placeholder="Re-enter your password" required />
+          </div>
+        </div>
+
+        <div id="signupMessage" class="form-message" aria-live="polite"></div>
+
+        <button type="submit" class="signin-btn">Create Account</button>
+      </form>
+
+      <div class="section-line"></div>
+
+      <div class="secondary-row">
+        <p>
+          Already have an account?
+          <a href="index.html" class="text-link strong-link">Login</a>
+        </p>
+      </div>
+    </section>
+  </main>
 
   <script type="module" src="js/script.js"></script>
-</head>
-
-<body>
-  <div class="container">
-    <div class="login-card">
-      <h1>Create Account</h1>
-      <p class="subtitle">Create an account to access MediTrust.</p>
-
-      <form id="signupForm">
-        <div class="row">
-          <div class="input-icon">
-            <i class="fa fa-user"></i>
-            <input type="text" id="firstName" placeholder="First Name" required />
-          </div>
-
-          <div class="input-icon">
-            <i class="fa fa-user"></i>
-            <input type="text" id="lastName" placeholder="Last Name" required />
-          </div>
-        </div>
-
-        <div class="input-icon">
-          <i class="fa fa-envelope"></i>
-          <input type="email" id="email" placeholder="Email Address" required />
-        </div>
-
-        <div class="input-icon">
-          <i class="fa fa-lock"></i>
-          <input type="password" id="password" placeholder="New Password (min 6 chars)" minlength="6" required />
-        </div>
-
-        <div class="input-icon">
-          <i class="fa fa-lock"></i>
-          <input type="password" id="confirmPassword" placeholder="Confirm Password" minlength="6" required />
-        </div>
-
-        <button type="submit">Create Account</button>
-
-        <p class="footer-text">
-          Already have an account?
-          <a href="index.html">Login</a>
-        </p>
-      </form>
-    </div>
-  </div>
 </body>
 </html>
