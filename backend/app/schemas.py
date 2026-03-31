@@ -1,4 +1,5 @@
 from pydantic import BaseModel, EmailStr, Field
+from typing import List
 
 
 class AssessmentIn(BaseModel):
@@ -28,7 +29,6 @@ class AuthOut(BaseModel):
     message: str
 
 
-
 class PredictRequest(BaseModel):
     age: float
     sex: int
@@ -45,7 +45,18 @@ class PredictRequest(BaseModel):
     thal: int
 
 
+class FeatureExplanation(BaseModel):
+    feature: str
+    value: float
+    impact: float
+    direction: str
+
+
 class PredictResponse(BaseModel):
     risk_probability: float = Field(..., ge=0.0, le=1.0)
     risk_level: str
     triage_recommendation: str
+    explanation_summary: str
+    top_features: List[FeatureExplanation]
+    all_features: List[FeatureExplanation]
+    base_value: float

@@ -1,41 +1,121 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <title>Login | MediTrust</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-
-    <link rel="stylesheet" href="css/style.css">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
-
-    <script type="module" src="js/script.js"></script>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>MediTrust | Clinician Portal</title>
+  <link rel="stylesheet" href="css/style.css" />
 </head>
+<body class="login-page">
+  <div class="page-bg"></div>
+  <div class="page-overlay"></div>
 
-<body>
-<div class="container">
-    <div class="login-card">
-        <h1>MediTrust</h1>
-        <p class="subtitle">Clinician Portal Login</p>
+  <main class="page-shell">
+    <section class="login-card">
+      <header class="login-header">
+        <h1 class="brand-title">MediTrust</h1>
+        <div class="header-divider"></div>
+        <h2 class="portal-title">Clinician Portal</h2>
+        <p class="portal-subtitle">
+          Secure clinical access for patient cardiovascular risk assessment
+        </p>
+      </header>
 
-        <form id="loginForm">
-            <div class="input-icon">
-                <i class="fa fa-envelope"></i>
-                <input type="email" id="email" placeholder="Email address" required>
-            </div>
+      <form id="loginForm" class="login-form" novalidate>
+        <div class="field">
+          <label for="email">Work Email</label>
+          <div class="input-wrap">
+            <span class="input-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none">
+                <path d="M4 6H20V18H4V6Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/>
+                <path d="M4 7L12 13L20 7" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+            </span>
+            <input
+              type="email"
+              id="email"
+              name="email"
+              placeholder="Enter your work email"
+              required
+            />
+          </div>
+        </div>
 
-            <div class="input-icon">
-                <i class="fa fa-lock"></i>
-                <input type="password" id="password" placeholder="Password" required>
-            </div>
+        <div class="field">
+          <label for="password">Password</label>
+          <div class="input-wrap">
+            <span class="input-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none">
+                <rect x="5" y="10" width="14" height="10" rx="2" stroke="currentColor" stroke-width="1.8"/>
+                <path d="M8 10V7.8C8 5.7 9.7 4 12 4C14.3 4 16 5.7 16 7.8V10" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+              </svg>
+            </span>
+            <input
+              type="password"
+              id="password"
+              name="password"
+              placeholder="Enter your password"
+              required
+              minlength="8"
+            />
+            <button
+              type="button"
+              id="togglePassword"
+              class="password-toggle"
+              aria-label="Toggle password visibility"
+            >
+              <svg id="eyeOpenIcon" viewBox="0 0 24 24" fill="none">
+                <path d="M2 12C4.2 7.8 7.8 5 12 5C16.2 5 19.8 7.8 22 12C19.8 16.2 16.2 19 12 19C7.8 19 4.2 16.2 2 12Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/>
+                <circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="1.8"/>
+              </svg>
+              <svg id="eyeClosedIcon" viewBox="0 0 24 24" fill="none" class="hidden-icon">
+                <path d="M3 3L21 21" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+                <path d="M10.6 6.3C11.06 6.1 11.53 6 12 6C16.2 6 19.8 8.8 22 13C21.15 14.62 20.05 15.95 18.74 16.93" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+                <path d="M14.12 14.12C13.58 14.66 12.82 15 12 15C10.34 15 9 13.66 9 12C9 11.18 9.34 10.42 9.88 9.88" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+                <path d="M6.06 9.26C4.75 10.23 3.66 11.52 2.82 13C5.02 17.2 8.4 20 12 20C13.96 20 15.81 19.17 17.38 17.74" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+            </button>
+          </div>
+        </div>
 
-            <button type="submit">Login</button>
+        <div class="utility-row">
+          <label class="remember">
+            <input type="checkbox" id="rememberMe" />
+            <span>Remember me</span>
+          </label>
 
-            <p class="footer-text">
-                New user?
-                <a href="signup.html">Create account</a>
-            </p>
-        </form>
-    </div>
-</div>
+          <a href="forgot-password.html" class="text-link">Forgot Password?</a>
+        </div>
+
+        <div id="loginMessage" class="form-message" aria-live="polite"></div>
+
+        <button type="submit" id="loginBtn" class="signin-btn">Sign In</button>
+      </form>
+
+      <div class="section-line"></div>
+
+      <div class="secondary-row">
+        <p>
+          New to MediTrust?
+          <a href="signup.html" class="text-link strong-link">Create Clinician Account</a>
+        </p>
+      </div>
+
+      <div class="section-line"></div>
+
+      <div class="trust-row">
+        <p>Authorized healthcare personnel only</p>
+        <p>Session monitoring enabled</p>
+      </div>
+
+      <div class="section-line"></div>
+
+      <div class="demo-row">
+        <a href="meditrust.html?demo=true" class="demo-link">Explore Demo</a>
+      </div>
+    </section>
+  </main>
+
+  <script type="module" src="js/script.js"></script>
 </body>
 </html>

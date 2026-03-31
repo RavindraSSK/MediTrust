@@ -16,16 +16,14 @@ from .schemas import (
     PredictRequest,
     PredictResponse,
 )
-from .ml_service import predict_probability
+from .ml_service import predict_probability, explain_prediction
 from .risk import risk_level_from_probability
 
 
 app = FastAPI(title="MediTrust API", version="0.1")
 
-# Password hashing setup
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
-# CORS Configuration (for Live Server frontend)
 ALLOWED_ORIGINS = [
     "http://127.0.0.1:5500",
     "http://localhost:5500",
@@ -37,25 +35,18 @@ ALLOWED_ORIGINS = [
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://127.0.0.1:5500",
-        "http://localhost:5500",
-    ],
-    allow_credentials=False,   # IMPORTANT (since we are not using cookies)
+    allow_origins=ALLOWED_ORIGINS,
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
 
-# Startup: Create Tables Automatically
 @app.on_event("startup")
 def on_startup():
     Base.metadata.create_all(bind=engine)
 
 
-# --------------------------------------------------
-# Basic Routes
-# --------------------------------------------------
 @app.get("/")
 def root():
     return {
@@ -74,12 +65,9 @@ def health():
 @app.get("/db-health")
 def db_health(db: Session = Depends(get_db)):
     db.execute(text("SELECT 1"))
-    return {"database": "PostgreSQL connected ✅"}
+    return {"database": "PostgreSQL connected "}
 
 
-# --------------------------------------------------
-# AUTH ROUTES
-# --------------------------------------------------
 @app.post("/auth/register", response_model=AuthOut)
 def register(data: RegisterIn, db: Session = Depends(get_db)):
     if len(data.password.encode("utf-8")) > 72:
@@ -114,13 +102,8 @@ def login(data: LoginIn, db: Session = Depends(get_db)):
     return {"ok": True, "message": "Login successful."}
 
 
-# --------------------------------------------------
-# RISK ASSESSMENT ROUTE
-# --------------------------------------------------
 @app.post("/assess", response_model=AssessmentOut)
 def assess(data: AssessmentIn, db: Session = Depends(get_db)):
-
-    # Sprint 1 dummy rule
     if data.age >= 50:
         risk_level = "High"
         risk_score = 0.8
@@ -146,18 +129,15 @@ def assess(data: AssessmentIn, db: Session = Depends(get_db)):
     )
 
 
-# --------------------------------------------------
-# ML PREDICTION ROUTE
-# --------------------------------------------------
 @app.post("/predict", response_model=PredictResponse, tags=["Prediction"])
 def predict(req: PredictRequest, db: Session = Depends(get_db)):
-
     payload = req.model_dump()
 
-    prob = predict_probability(payload)
+    prob = float(predict_probability(payload))
     level, msg = risk_level_from_probability(prob)
 
-    # Save prediction log
+    top_features, all_features, base_value, explanation_summary = explain_prediction(payload, level)
+
     log = models.PredictionLog(
         **payload,
         risk_probability=prob,
@@ -170,12 +150,16 @@ def predict(req: PredictRequest, db: Session = Depends(get_db)):
     return PredictResponse(
         risk_probability=prob,
         risk_level=level,
-        triage_recommendation=msg
+        triage_recommendation=msg,
+        explanation_summary=explanation_summary,
+        top_features=top_features,
+        all_features=all_features,
+        base_value=base_value
     )
+
 
 @app.get("/predictions/recent", tags=["Prediction"])
 def recent_predictions(db: Session = Depends(get_db)):
-
     rows = (
         db.query(models.PredictionLog)
         .order_by(models.PredictionLog.id.desc())
