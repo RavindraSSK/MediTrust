@@ -742,3 +742,15 @@ a {
   font-size: 0.92rem;
   font-weight: 600;
 }
+.explore-demo {
+  margin-top: 10px;
+  font-size: 14px;
+  color: rgba(255, 255, 255, 0.75);  /* same tone as other text */
+  text-align: center;
+  cursor: pointer;
+  transition: 0.3s;
+}
+
+.explore-demo:hover {
+  text-decoration: underline;
+}
