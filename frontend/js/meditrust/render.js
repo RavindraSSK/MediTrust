@@ -181,6 +181,16 @@ export function renderRiskResult(data) {
   if (barEl && score !== null) {
     const pct = Math.min(100, Math.max(0, Math.round(score * 100)));
     barEl.style.width = `${pct}%`;
+
+    barEl.classList.remove("low", "medium", "high");
+
+    if (riskLevel === "High") {
+      barEl.classList.add("high");
+    } else if (riskLevel === "Medium") {
+      barEl.classList.add("medium");
+    } else {
+      barEl.classList.add("low");
+    }
   }
 
   renderWorkflowNotice(data);

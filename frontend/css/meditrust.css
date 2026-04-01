@@ -436,10 +436,21 @@ input:focus, select:focus{
 .bar{
   height:100%;
   width:0%;
-  background:linear-gradient(90deg,#22c55e,#f59e0b,#ef4444);
-  transition: width .35s ease;
+  transition: width .35s ease, background .3s ease;
+  background:#22c55e;
 }
 
+.bar.low{
+  background:linear-gradient(90deg,#16a34a,#4ade80);
+}
+
+.bar.medium{
+  background:linear-gradient(90deg,#f59e0b,#fbbf24);
+}
+
+.bar.high{
+  background:linear-gradient(90deg,#ef4444,#f87171);
+}
 .note{
   margin-top:16px;
   font-size:14px;
