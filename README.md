@@ -13,7 +13,7 @@
 - Store predictions in database
 - Connect frontend with backend prediction API
 
-## Sprint 3 – Explainability & Enhancement (In Progress)
+## Sprint 3 – Explainability & Enhancement
 - Integrate SHAP for model explainability
 - Add feature importance visualization
 - Improve UI/UX (modern healthcare dashboard)
