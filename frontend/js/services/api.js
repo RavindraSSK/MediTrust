@@ -1,16 +1,17 @@
 import { API_BASE } from "../config.js";
 
-export async function registerUser(fullName, email, password) {
+export async function registerUser(fullName, email, password, role = "Doctor", hospitalName = "") {
   const res = await fetch(`${API_BASE}/auth/register`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ full_name: fullName, email, password }),
+    body: JSON.stringify({
+      full_name: fullName,
+      email,
+      password,
+      role,
+      hospital_name: hospitalName
+    }),
   });
-
-  if (!res.ok) {
-    const txt = await res.text();
-    throw new Error(txt || `Register failed (${res.status})`);
-  }
 
   return await res.json();
 }
@@ -22,10 +23,38 @@ export async function loginUser(email, password) {
     body: JSON.stringify({ email, password }),
   });
 
-  if (!res.ok) {
-    const txt = await res.text();
-    throw new Error(txt || `Login failed (${res.status})`);
-  }
+  return await res.json();
+}
+
+export async function requestPasswordReset(email) {
+  const res = await fetch(`${API_BASE}/auth/request-reset`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email }),
+  });
+
+  return await res.json();
+}
+
+export async function verifyResetCode(email, code) {
+  const res = await fetch(`${API_BASE}/auth/verify-reset-code`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email, code }),
+  });
+
+  return await res.json();
+}
+
+export async function resetPassword(email, newPassword) {
+  const res = await fetch(`${API_BASE}/auth/reset-password`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      email,
+      new_password: newPassword
+    }),
+  });
 
   return await res.json();
 }
