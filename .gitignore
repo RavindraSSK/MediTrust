@@ -1,7 +1,8 @@
 # Python
 __pycache__/
 *.pyc
-
+.codex_tmp_pymupdf/
+tmp_pdf_latest/
 # Virtual environments
 .venv/
 venv/
