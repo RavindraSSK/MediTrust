@@ -1,3 +1,5 @@
+@import url("https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap");
+
 * {
   margin: 0;
   padding: 0;
@@ -19,11 +21,13 @@
 }
 
 body {
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: "Plus Jakarta Sans", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
 }
 
 button,
-input {
+input,
+select,
+textarea {
   font: inherit;
 }
 
@@ -77,13 +81,14 @@ a {
   padding: 42px 42px 30px;
   border-radius: 28px;
   overflow: hidden;
-  background: rgba(255, 255, 255, 0.06);
-  backdrop-filter: blur(18px);
-  -webkit-backdrop-filter: blur(28px);
-  border: 1.5px solid rgba(255, 255, 255, 0.25);
+  background: linear-gradient(180deg, rgba(18, 40, 68, 0.70), rgba(24, 54, 91, 0.82));
+  backdrop-filter: blur(20px) saturate(145%);
+  -webkit-backdrop-filter: blur(20px) saturate(145%);
+  border: 1px solid rgba(255, 255, 255, 0.22);
   box-shadow:
-    0 30px 60px rgba(0, 0, 0, 0.15),
-    inset 0 1px 0 rgba(255, 255, 255, 0.25);
+    0 28px 64px rgba(3, 10, 24, 0.30),
+    inset 0 1px 0 rgba(255, 255, 255, 0.22),
+    inset 0 -1px 0 rgba(255, 255, 255, 0.06);
 }
 
 .login-card::before {
@@ -92,12 +97,13 @@ a {
   inset: 0;
   border-radius: 28px;
   background: linear-gradient(
-    120deg,
-    rgba(255, 255, 255, 0.30),
-    rgba(255, 255, 255, 0.05),
-    rgba(255, 255, 255, 0.30)
+    135deg,
+    rgba(255,255,255,0.26) 0%,
+    rgba(255,255,255,0.10) 24%,
+    rgba(255,255,255,0.03) 52%,
+    rgba(255,255,255,0.14) 100%
   );
-  opacity: 0.25;
+  opacity: 0.24;
   pointer-events: none;
 }
 
@@ -119,9 +125,10 @@ a {
 .brand-title {
   font-size: 3rem;
   font-weight: 800;
-  color: var(--navy);
+  color: #eef7ff;
   letter-spacing: 0.2px;
   margin-bottom: 16px;
+  text-shadow: 0 6px 20px rgba(3, 10, 24, 0.22);
 }
 
 .header-divider {
@@ -144,7 +151,8 @@ a {
   letter-spacing: 0.2px;
   padding: 6px 16px;
   border-radius: 12px;
-  background: rgba(255, 255, 255, 0.05);
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.10);
   text-shadow:
     0 2px 8px rgba(0, 0, 0, 0.18),
     0 0 1px rgba(255, 255, 255, 0.35);
@@ -152,7 +160,7 @@ a {
 .portal-subtitle {
   max-width: 470px;
   margin: 0 auto;
-  color: #53697d;
+  color: #dceaf6;
   font-size: 1rem;
   font-weight: 650;
   line-height: 1.45;
@@ -278,7 +286,7 @@ a {
 }
 
 .text-link {
-  color: var(--link);
+  color: #8dc2ff;
   font-size: 0.97rem;
   font-weight: 700;
 }
@@ -294,7 +302,7 @@ a {
 .form-message {
   min-height: 20px;
   margin-bottom: 10px;
-  color: #b42318;
+  color: #ffd0c9;
   font-size: 0.92rem;
   font-weight: 700;
 }
@@ -441,13 +449,14 @@ a {
   padding: 34px;
   border-radius: 28px;
   overflow: hidden;
-  background: rgba(255, 255, 255, 0.08);
-  backdrop-filter: blur(18px);
-  -webkit-backdrop-filter: blur(18px);
-  border: 1px solid rgba(255, 255, 255, 0.24);
+  background: linear-gradient(180deg, rgba(18, 40, 68, 0.70), rgba(24, 54, 91, 0.82));
+  backdrop-filter: blur(20px) saturate(145%);
+  -webkit-backdrop-filter: blur(20px) saturate(145%);
+  border: 1px solid rgba(255, 255, 255, 0.22);
   box-shadow:
-    0 24px 50px rgba(0, 0, 0, 0.15),
-    inset 0 1px 0 rgba(255, 255, 255, 0.18);
+    0 28px 64px rgba(3, 10, 24, 0.30),
+    inset 0 1px 0 rgba(255, 255, 255, 0.22),
+    inset 0 -1px 0 rgba(255, 255, 255, 0.06);
 }
 
 .dashboard-card::before {
@@ -455,12 +464,13 @@ a {
   position: absolute;
   inset: 0;
   background: linear-gradient(
-    120deg,
-    rgba(255,255,255,0.18),
-    rgba(255,255,255,0.03),
-    rgba(255,255,255,0.18)
+    135deg,
+    rgba(255,255,255,0.26) 0%,
+    rgba(255,255,255,0.10) 24%,
+    rgba(255,255,255,0.03) 52%,
+    rgba(255,255,255,0.14) 100%
   );
-  opacity: 0.2;
+  opacity: 0.24;
   pointer-events: none;
 }
 

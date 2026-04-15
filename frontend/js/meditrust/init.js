@@ -4,6 +4,7 @@ import { isLoggedIn, logout, getCurrentUser } from "../auth/session.js";
 import { getMediTrustElements } from "./form.js";
 import { handlePrediction } from "./predict.js";
 import { clearError } from "./render.js";
+import { downloadLatestRiskReport } from "./report.js";
 
 function getDashboardPageForRole(role) {
   if (role === "Doctor") return "doctor-dashboard.html";
@@ -62,6 +63,7 @@ export function initMediTrustPage() {
 
   elements.form?.addEventListener("submit", handler);
   elements.btn?.addEventListener("click", handler);
+  elements.downloadReportBtn?.addEventListener("click", () => downloadLatestRiskReport(elements, user));
 
   clearError();
 }

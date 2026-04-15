@@ -1,3 +1,5 @@
+@import url("https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap");
+
 :root{
   --bg:#edf3fb;
   --card:#ffffff;
@@ -28,7 +30,7 @@
 
 body{
   margin:0;
-  font-family: system-ui, -apple-system, sans-serif;
+  font-family: "Plus Jakarta Sans", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   background:
     radial-gradient(circle at 12% 10%, rgba(30,58,95,.16), transparent 34%),
     radial-gradient(circle at 88% 0%, rgba(37,99,235,.10), transparent 30%),
@@ -39,6 +41,13 @@ body{
   justify-content:center;
   padding:24px;
   color:var(--text);
+}
+
+button,
+input,
+select,
+textarea{
+  font: inherit;
 }
 
 .wrapper{
@@ -1021,11 +1030,60 @@ input:focus, select:focus{
 .result-actions {
   margin-top: 18px;
   display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
   justify-content: flex-end;
 }
 
 .result-link-btn {
   text-decoration: none;
+}
+
+.bottom-report-action {
+  margin-top: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.report-download-btn {
+  min-width: 240px;
+  border: 1px solid rgba(29, 78, 216, 0.12);
+  background:
+    linear-gradient(135deg, rgba(29, 78, 216, 0.96), rgba(59, 130, 246, 0.96)),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.18), rgba(255, 255, 255, 0.04));
+  color: #ffffff;
+  padding: 14px 24px;
+  border-radius: 999px;
+  font-weight: 800;
+  font-size: 15px;
+  letter-spacing: 0.2px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow:
+    0 14px 30px rgba(29, 78, 216, 0.18),
+    inset 0 1px 0 rgba(255, 255, 255, 0.22);
+  transition: transform 0.2s ease, box-shadow 0.2s ease, opacity 0.2s ease;
+}
+
+.report-download-btn:hover {
+  transform: translateY(-1px);
+  box-shadow:
+    0 18px 34px rgba(29, 78, 216, 0.22),
+    inset 0 1px 0 rgba(255, 255, 255, 0.22);
+}
+
+.report-download-btn:active {
+  transform: translateY(0);
+}
+
+.report-download-btn:disabled {
+  opacity: 0.72;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
 }
 
 .demo-chip {

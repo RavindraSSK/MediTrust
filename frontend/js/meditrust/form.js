@@ -5,6 +5,7 @@ export function getMediTrustElements() {
     nameEl: pickId("patientName", "name"),
     ageEl: pickId("patientAge", "age"),
     btn: pickId("checkRiskBtn", "btn"),
+    downloadReportBtn: pickId("downloadReportBtn"),
     form: pickId("riskForm"),
     sexEl: pickId("sex"),
     cpEl: pickId("cp"),

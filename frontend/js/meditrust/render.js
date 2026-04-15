@@ -1,5 +1,7 @@
 import { pickId, setText, show, safeNumber } from "../utils.js";
 
+let latestRiskResult = null;
+
 function getClinicalFeatureLabel(feature) {
   const labels = {
     age: "age",
@@ -139,6 +141,8 @@ function renderWorkflowNotice(data) {
 }
 
 export function renderRiskResult(data) {
+  latestRiskResult = data;
+
   const riskLevelEl = pickId("riskLevel");
   const riskScoreEl = pickId("riskScore");
 
@@ -147,6 +151,7 @@ export function renderRiskResult(data) {
   const barEl = pickId("riskBarFill", "bar");
   const resultSec = pickId("resultSection", "result");
   const explanationSec = pickId("explanationSection");
+  const bottomReportAction = pickId("bottomReportAction");
 
   const riskLevel = data.risk_level || "-";
 
@@ -253,6 +258,12 @@ export function renderRiskResult(data) {
     resultSec.classList.add("show");
     requestAnimationFrame(() => resultSec.classList.add("visible"));
   }
+
+  show(bottomReportAction, true);
+}
+
+export function getLatestRiskResult() {
+  return latestRiskResult;
 }
 
 export function renderError(msg) {
