@@ -1,11 +1,12 @@
 import { API_BASE } from "../config.js";
 
-export async function registerUser(fullName, email, password, role = "Doctor", hospitalName = "") {
+export async function registerUser(firstName, lastName, email, password, role = "Doctor", hospitalName = "") {
   const res = await fetch(`${API_BASE}/auth/register`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
-      full_name: fullName,
+      first_name: firstName,
+      last_name: lastName,
       email,
       password,
       role,
@@ -59,11 +60,25 @@ export async function resetPassword(email, newPassword) {
   return await res.json();
 }
 
-export async function assessRisk(fullName, age) {
+export async function changePassword(email, currentPassword, newPassword) {
+  const res = await fetch(`${API_BASE}/auth/change-password`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      email,
+      current_password: currentPassword,
+      new_password: newPassword
+    }),
+  });
+
+  return await res.json();
+}
+
+export async function assessRisk(firstName, lastName, age) {
   const res = await fetch(`${API_BASE}/assess`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ full_name: fullName, age }),
+    body: JSON.stringify({ first_name: firstName, last_name: lastName, age }),
   });
 
   if (!res.ok) {

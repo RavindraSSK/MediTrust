@@ -8,6 +8,8 @@ class Assessment(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     full_name = Column(String, nullable=False)
+    first_name = Column(String, nullable=False)
+    last_name = Column(String, nullable=False)
     age = Column(Integer, nullable=False)
     risk_level = Column(String, nullable=False)
     risk_score = Column(Float, nullable=False)
@@ -18,6 +20,8 @@ class User(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     full_name = Column(String, nullable=False)
+    first_name = Column(String, nullable=False)
+    last_name = Column(String, nullable=False)
     email = Column(String, unique=True, index=True, nullable=False)
     password_hash = Column(String, nullable=False)
     role = Column(String, nullable=False, default="Doctor")
@@ -28,6 +32,9 @@ class PredictionLog(Base):
     __tablename__ = "prediction_logs"
 
     id = Column(Integer, primary_key=True, index=True)
+    full_name = Column(String, nullable=True)
+    first_name = Column(String, nullable=True)
+    last_name = Column(String, nullable=True)
 
     age = Column(Float)
     sex = Column(Integer)

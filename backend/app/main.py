@@ -45,9 +45,87 @@ app.add_middleware(
 app.include_router(auth_extra_router)
 
 
+def compose_full_name(first_name: str, last_name: str) -> str:
+    return f"{first_name.strip()} {last_name.strip()}".strip()
+
+
+def migrate_name_columns():
+    if engine.dialect.name != "sqlite":
+        return
+
+    with engine.begin() as conn:
+        for statement in [
+            "ALTER TABLE users ADD COLUMN first_name VARCHAR",
+            "ALTER TABLE users ADD COLUMN last_name VARCHAR",
+            "ALTER TABLE assessments ADD COLUMN first_name VARCHAR",
+            "ALTER TABLE assessments ADD COLUMN last_name VARCHAR",
+            "ALTER TABLE prediction_logs ADD COLUMN first_name VARCHAR",
+            "ALTER TABLE prediction_logs ADD COLUMN last_name VARCHAR",
+            "ALTER TABLE prediction_logs ADD COLUMN full_name VARCHAR",
+        ]:
+            try:
+                conn.execute(text(statement))
+            except Exception:
+                pass
+
+        for table_name in ["users", "assessments"]:
+            rows = conn.execute(text(f"PRAGMA table_info({table_name})")).mappings().all()
+            column_names = {row["name"] for row in rows}
+            if "full_name" not in column_names or "first_name" not in column_names or "last_name" not in column_names:
+                continue
+
+            conn.execute(
+                text(
+                    f"""
+                    UPDATE {table_name}
+                    SET
+                        first_name = CASE
+                            WHEN instr(trim(full_name), ' ') > 0 THEN substr(trim(full_name), 1, instr(trim(full_name), ' ') - 1)
+                            ELSE trim(full_name)
+                        END,
+                        last_name = CASE
+                            WHEN instr(trim(full_name), ' ') > 0 THEN substr(trim(full_name), instr(trim(full_name), ' ') + 1)
+                            ELSE ''
+                        END
+                    WHERE first_name IS NULL OR trim(first_name) = ''
+                    """
+                )
+            )
+            conn.execute(
+                text(f"UPDATE {table_name} SET last_name = '' WHERE last_name IS NULL")
+            )
+
+
+def serialize_prediction_log(row):
+    return {
+        "id": row.id,
+        "full_name": row.full_name,
+        "first_name": row.first_name,
+        "last_name": row.last_name,
+        "risk_probability": row.risk_probability,
+        "risk_level": row.risk_level,
+        "age": row.age,
+        "trestbps": row.trestbps,
+        "chol": row.chol,
+        "fbs": row.fbs,
+        "restecg": row.restecg,
+        "thalach": row.thalach,
+        "exang": row.exang,
+        "oldpeak": row.oldpeak,
+        "slope": row.slope,
+        "ca": row.ca,
+        "thal": row.thal,
+        "cp": row.cp,
+        "sex": row.sex,
+        "created_at": row.created_at,
+        "triage_message": risk_level_from_probability(float(row.risk_probability or 0))[1],
+    }
+
+
 @app.on_event("startup")
 def on_startup():
     Base.metadata.create_all(bind=engine)
+    migrate_name_columns()
 
 
 @app.get("/")
@@ -73,16 +151,15 @@ def db_health(db: Session = Depends(get_db)):
 
 @app.post("/auth/register", response_model=AuthOut)
 def register(data: RegisterIn, db: Session = Depends(get_db)):
-    if len(data.password.encode("utf-8")) > 72:
-        return {"ok": False, "message": "Password too long (max 72 characters)."}
-
     email = data.email.lower().strip()
     existing = db.query(User).filter(User.email == email).first()
     if existing:
         return {"ok": False, "message": "Email already registered."}
 
     user = User(
-        full_name=data.full_name.strip(),
+        full_name=compose_full_name(data.first_name, data.last_name),
+        first_name=data.first_name.strip(),
+        last_name=data.last_name.strip(),
         email=email,
         password_hash=pwd_context.hash(data.password),
         role=data.role or "Doctor",
@@ -109,7 +186,9 @@ def login(data: LoginIn, db: Session = Depends(get_db)):
         "ok": True,
         "message": "Login successful.",
         "email": user.email,
-        "full_name": user.full_name,
+        "first_name": user.first_name,
+        "last_name": user.last_name,
+        "full_name": compose_full_name(user.first_name, user.last_name),
         "role": user.role,
     }
 
@@ -124,7 +203,9 @@ def assess(data: AssessmentIn, db: Session = Depends(get_db)):
         risk_score = 0.3
 
     record = models.Assessment(
-        full_name=data.full_name.strip(),
+        full_name=compose_full_name(data.first_name, data.last_name),
+        first_name=data.first_name.strip(),
+        last_name=data.last_name.strip(),
         age=data.age,
         risk_level=risk_level,
         risk_score=risk_score,
@@ -143,7 +224,11 @@ def assess(data: AssessmentIn, db: Session = Depends(get_db)):
 
 @app.post("/predict", response_model=PredictResponse, tags=["Prediction"])
 def predict(req: PredictRequest, db: Session = Depends(get_db)):
-    payload = req.model_dump()
+    raw_payload = req.model_dump()
+    first_name = raw_payload.pop("first_name").strip()
+    last_name = raw_payload.pop("last_name").strip()
+    full_name = compose_full_name(first_name, last_name)
+    payload = raw_payload
 
     prob = float(predict_probability(payload))
     level, msg = risk_level_from_probability(prob)
@@ -151,6 +236,9 @@ def predict(req: PredictRequest, db: Session = Depends(get_db)):
     top_features, all_features, base_value, explanation_summary = explain_prediction(payload, level)
 
     log = models.PredictionLog(
+        full_name=full_name,
+        first_name=first_name,
+        last_name=last_name,
         **payload,
         risk_probability=prob,
         risk_level=level
@@ -180,15 +268,7 @@ def recent_predictions(db: Session = Depends(get_db)):
     )
 
     return [
-        {
-            "id": r.id,
-            "risk_probability": r.risk_probability,
-            "risk_level": r.risk_level,
-            "age": r.age,
-            "trestbps": r.trestbps,
-            "chol": r.chol,
-            "created_at": r.created_at
-        }
+        serialize_prediction_log(r)
         for r in rows
     ]
 
@@ -204,18 +284,75 @@ def urgent_predictions(db: Session = Depends(get_db)):
     )
 
     return [
-        {
-            "id": r.id,
-            "risk_probability": r.risk_probability,
-            "risk_level": r.risk_level,
-            "age": r.age,
-            "trestbps": r.trestbps,
-            "chol": r.chol,
-            "created_at": r.created_at,
-            "triage_message": "Immediate physician evaluation recommended"
-        }
+        serialize_prediction_log(r)
         for r in rows
     ]
+
+
+@app.get("/patients/recent", tags=["Patients"])
+def recent_patients(limit: int = 5, db: Session = Depends(get_db)):
+    rows = (
+        db.query(models.PredictionLog)
+        .filter(models.PredictionLog.full_name.isnot(None))
+        .filter(models.PredictionLog.full_name != "")
+        .order_by(models.PredictionLog.created_at.desc(), models.PredictionLog.id.desc())
+        .all()
+    )
+
+    seen = set()
+    patients = []
+    for row in rows:
+        key = (row.first_name or "", row.last_name or "", row.full_name or "")
+        if key in seen:
+            continue
+        seen.add(key)
+        patients.append(serialize_prediction_log(row))
+        if len(patients) >= max(1, min(limit, 20)):
+            break
+
+    return patients
+
+
+@app.get("/patients/search", tags=["Patients"])
+def search_patients(q: str = "", db: Session = Depends(get_db)):
+    query = q.strip()
+    if not query:
+        return []
+
+    like_query = f"%{query}%"
+    rows = (
+        db.query(models.PredictionLog)
+        .filter(models.PredictionLog.full_name.isnot(None))
+        .filter(models.PredictionLog.full_name.ilike(like_query))
+        .order_by(models.PredictionLog.created_at.desc(), models.PredictionLog.id.desc())
+        .all()
+    )
+
+    seen = set()
+    patients = []
+    for row in rows:
+        key = (row.first_name or "", row.last_name or "", row.full_name or "")
+        if key in seen:
+            continue
+        seen.add(key)
+        patients.append(serialize_prediction_log(row))
+        if len(patients) >= 20:
+            break
+
+    return patients
+
+
+@app.get("/patients/records", tags=["Patients"])
+def patient_records(first_name: str, last_name: str, db: Session = Depends(get_db)):
+    rows = (
+        db.query(models.PredictionLog)
+        .filter(models.PredictionLog.first_name == first_name.strip())
+        .filter(models.PredictionLog.last_name == last_name.strip())
+        .order_by(models.PredictionLog.created_at.desc(), models.PredictionLog.id.desc())
+        .all()
+    )
+
+    return [serialize_prediction_log(row) for row in rows]
 
 
 @app.get("/dashboard/summary", tags=["Dashboard"])

@@ -1,14 +1,25 @@
-import { changePassword } from "../services/api.js";
-import { renderPasswordRules } from "./password-rules.js";
+import { changePassword } from "../services/api.js?v=20260418f";
+import {
+  renderPasswordRules,
+  isPasswordValid,
+  getPasswordValidationMessage,
+} from "./password-rules.js?v=20260418f";
+import { attachPasswordToggle } from "./password-toggle.js?v=20260418f";
 
 const form = document.getElementById("changePasswordForm");
 const message = document.getElementById("changePasswordMessage");
 const passwordInput = document.getElementById("newPassword");
 const rulesBox = document.getElementById("passwordRules");
 
+attachPasswordToggle("currentPassword", "toggleCurrentPassword", "currentEyeOpenIcon", "currentEyeClosedIcon");
+attachPasswordToggle("newPassword", "toggleChangePassword", "changeEyeOpenIcon", "changeEyeClosedIcon");
+attachPasswordToggle("confirmPassword", "toggleChangeConfirmPassword", "changeConfirmEyeOpenIcon", "changeConfirmEyeClosedIcon");
+
 passwordInput?.addEventListener("input", () => {
   renderPasswordRules(rulesBox, passwordInput.value);
 });
+
+renderPasswordRules(rulesBox, passwordInput?.value || "");
 
 form?.addEventListener("submit", async (e) => {
   e.preventDefault();
@@ -26,6 +37,11 @@ form?.addEventListener("submit", async (e) => {
 
   if (newPassword !== confirmPassword) {
     message.textContent = "Passwords do not match.";
+    return;
+  }
+
+  if (!isPasswordValid(newPassword)) {
+    message.textContent = getPasswordValidationMessage(newPassword);
     return;
   }
 

@@ -249,6 +249,30 @@ a {
   height: 18px;
 }
 
+.password-rules {
+  margin-top: 10px;
+}
+
+.rules-list {
+  list-style: none;
+  display: grid;
+  gap: 6px;
+}
+
+.rule-ok,
+.rule-pending {
+  font-size: 0.9rem;
+  font-weight: 700;
+}
+
+.rule-ok {
+  color: #0f7b39;
+}
+
+.rule-pending {
+  color: #5e6f82;
+}
+
 .hidden-icon {
   display: none;
 }

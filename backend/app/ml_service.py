@@ -7,9 +7,18 @@ import shap
 
 BASE_DIR = Path(__file__).resolve().parents[2]
 
-MODEL_PATH = BASE_DIR / "ml" / "models" / "model.joblib"
-PREPROCESSOR_PATH = BASE_DIR / "ml" / "models" / "preprocessor.joblib"
-BACKGROUND_DATA_PATH = BASE_DIR / "ml" / "data" / "processed" / "heart_disease_clean.csv"
+MODEL_PATH_CANDIDATES = [
+    BASE_DIR / "ml" / "models" / "model.joblib",
+    BASE_DIR / "backend" / "ml" / "models" / "model.joblib",
+]
+PREPROCESSOR_PATH_CANDIDATES = [
+    BASE_DIR / "ml" / "models" / "preprocessor.joblib",
+    BASE_DIR / "backend" / "ml" / "models" / "preprocessor.joblib",
+]
+BACKGROUND_DATA_PATH_CANDIDATES = [
+    BASE_DIR / "ml" / "data" / "processed" / "heart_disease_clean.csv",
+    BASE_DIR / "backend" / "ml" / "data" / "processed" / "heart_disease_clean.csv",
+]
 
 
 RAW_FEATURE_ORDER = [
@@ -34,18 +43,33 @@ _explainer = None
 _background_dense = None
 
 
+def _resolve_existing_path(candidates: list[Path], label: str) -> Path:
+    for path in candidates:
+        if path.exists():
+            return path
+
+    searched = ", ".join(str(path) for path in candidates)
+    raise FileNotFoundError(f"{label} not found. Looked in: {searched}")
+
+
 def _load_background_frame() -> pd.DataFrame:
     """
     Load a small representative background dataset for SHAP.
     This should be the cleaned training-style feature table.
     """
-    if not BACKGROUND_DATA_PATH.exists():
+    background_path = None
+    for candidate in BACKGROUND_DATA_PATH_CANDIDATES:
+        if candidate.exists():
+            background_path = candidate
+            break
+
+    if background_path is None:
         raise FileNotFoundError(
-            f"Background data not found: {BACKGROUND_DATA_PATH}. "
-            f"Place your cleaned heart dataset there."
+            "Background data not found. "
+            f"Looked in: {', '.join(str(path) for path in BACKGROUND_DATA_PATH_CANDIDATES)}"
         )
 
-    df = pd.read_csv(BACKGROUND_DATA_PATH)
+    df = pd.read_csv(background_path)
 
     # Keep only model input columns
     missing = [col for col in RAW_FEATURE_ORDER if col not in df.columns]
@@ -79,21 +103,26 @@ def _load_artifacts():
     global _model, _preprocessor, _explainer, _background_dense
 
     if _preprocessor is None:
-        if not PREPROCESSOR_PATH.exists():
-            raise FileNotFoundError(f"Preprocessor not found: {PREPROCESSOR_PATH}")
-        _preprocessor = joblib.load(PREPROCESSOR_PATH)
+        _preprocessor = joblib.load(
+            _resolve_existing_path(PREPROCESSOR_PATH_CANDIDATES, "Preprocessor")
+        )
 
     if _model is None:
-        if not MODEL_PATH.exists():
-            raise FileNotFoundError(f"Model not found: {MODEL_PATH}")
-        _model = joblib.load(MODEL_PATH)
+        _model = joblib.load(
+            _resolve_existing_path(MODEL_PATH_CANDIDATES, "Model")
+        )
+        if not hasattr(_model, "multi_class"):
+            _model.multi_class = "auto"
 
-    if _background_dense is None:
-        background_df = _load_background_frame()
-        background_transformed = _preprocessor.transform(background_df)
-        _background_dense = _to_dense(background_transformed)
+    if _background_dense is None and _explainer is None:
+        try:
+            background_df = _load_background_frame()
+            background_transformed = _preprocessor.transform(background_df)
+            _background_dense = _to_dense(background_transformed)
+        except Exception:
+            _background_dense = None
 
-    if _explainer is None:
+    if _explainer is None and _background_dense is not None:
         # Preferred for tree models: probability-space explanation
         try:
             _explainer = shap.TreeExplainer(
@@ -225,6 +254,22 @@ def _aggregate_shap_values(feature_names: list[str], shap_values: np.ndarray, pa
     return explanations
 
 
+def _aggregate_linear_contributions(model, preprocessor, payload: dict):
+    """
+    Fallback explanation path when SHAP background data is unavailable.
+    For linear models, use transformed-feature coefficient contributions.
+    """
+    if not hasattr(model, "coef_"):
+        return []
+
+    df = _make_dataframe(payload)
+    X_t = preprocessor.transform(df)
+    X_dense = _to_dense(X_t)
+    feature_names = _get_feature_names(preprocessor)
+    contributions = X_dense[0] * np.asarray(model.coef_[0], dtype=float)
+    return _aggregate_shap_values(feature_names, contributions, payload)
+
+
 def explain_prediction(payload: dict, risk_level: str):
     """
     Returns:
@@ -240,12 +285,15 @@ def explain_prediction(payload: dict, risk_level: str):
     X_dense = _to_dense(X_t)
     feature_names = _get_feature_names(preprocessor)
 
-    shap_output = explainer(X_dense)
+    if explainer is not None:
+        shap_output = explainer(X_dense)
+        shap_values = _extract_shap_array(shap_output)
+        base_value = _get_base_value(shap_output)
+        all_features = _aggregate_shap_values(feature_names, shap_values, payload)
+    else:
+        base_value = float(getattr(model, "intercept_", [0.0])[0])
+        all_features = _aggregate_linear_contributions(model, preprocessor, payload)
 
-    shap_values = _extract_shap_array(shap_output)
-    base_value = _get_base_value(shap_output)
-
-    all_features = _aggregate_shap_values(feature_names, shap_values, payload)
     top_features = all_features[:6]
 
     if not top_features:

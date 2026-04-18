@@ -1,4 +1,4 @@
-import { requestPasswordReset } from "../services/api.js";
+import { requestPasswordReset } from "../services/api.js?v=20260418f";
 
 const form = document.getElementById("forgotPasswordForm");
 const message = document.getElementById("forgotPasswordMessage");

@@ -2,13 +2,19 @@ const API_BASE = "http://127.0.0.1:8000";
 
 export function getCurrentUser(requiredRole) {
   const user = JSON.parse(localStorage.getItem("meditrust_user") || "{}");
+  const fallbackRole = localStorage.getItem("mt_user_role") || "";
+  const normalized = {
+    ...user,
+    role: user.role || fallbackRole,
+    full_name: user.full_name || localStorage.getItem("mt_user_name") || "",
+  };
 
-  if (!user.ok || user.role !== requiredRole) {
+  if (!normalized.ok || normalized.role !== requiredRole) {
     window.location.href = "index.html";
     return null;
   }
 
-  return user;
+  return normalized;
 }
 
 export function attachLogout(buttonId = "logoutBtn") {
@@ -17,6 +23,9 @@ export function attachLogout(buttonId = "logoutBtn") {
 
   btn.addEventListener("click", () => {
     localStorage.removeItem("meditrust_user");
+    localStorage.removeItem("mt_user_email");
+    localStorage.removeItem("mt_user_role");
+    localStorage.removeItem("mt_user_name");
     window.location.href = "index.html";
   });
 }
