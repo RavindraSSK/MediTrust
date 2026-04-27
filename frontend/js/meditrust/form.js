@@ -2,7 +2,8 @@ import { pickId, safeNumber } from "../utils.js";
 
 export function getMediTrustElements() {
   return {
-    nameEl: pickId("patientName", "name"),
+    firstNameEl: pickId("patientFirstName", "firstName"),
+    lastNameEl: pickId("patientLastName", "lastName"),
     ageEl: pickId("patientAge", "age"),
     btn: pickId("checkRiskBtn", "btn"),
     form: pickId("riskForm"),
@@ -23,6 +24,8 @@ export function getMediTrustElements() {
 
 export function buildPredictPayload(elements) {
   return {
+    first_name: (elements.firstNameEl?.value || "").trim(),
+    last_name: (elements.lastNameEl?.value || "").trim(),
     age: safeNumber(elements.ageEl?.value),
     sex: Number(elements.sexEl.value),
     cp: Number(elements.cpEl.value),

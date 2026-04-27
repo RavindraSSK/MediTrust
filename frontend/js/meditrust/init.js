@@ -1,9 +1,9 @@
-import { PAGE_LOGIN } from "../config.js";
-import { go, $, setText } from "../utils.js";
-import { isLoggedIn, logout, getCurrentUser } from "../auth/session.js";
-import { getMediTrustElements } from "./form.js";
-import { handlePrediction } from "./predict.js";
-import { clearError } from "./render.js";
+import { PAGE_LOGIN } from "../config.js?v=20260418f";
+import { go, $, setText } from "../utils.js?v=20260418f";
+import { isLoggedIn, logout, getCurrentUser } from "../auth/session.js?v=20260418f";
+import { getMediTrustElements } from "./form.js?v=20260418f";
+import { handlePrediction } from "./predict.js?v=20260418f";
+import { clearError } from "./render.js?v=20260418f";
 
 function getDashboardPageForRole(role) {
   if (role === "Doctor") return "doctor-dashboard.html";
@@ -12,12 +12,21 @@ function getDashboardPageForRole(role) {
   return PAGE_LOGIN;
 }
 
+function getDisplayName(user) {
+  if (!user) return "";
+  const combined = [user.first_name, user.last_name].filter(Boolean).join(" ").trim();
+  return combined || user.full_name || user.email || "";
+}
+
 function applyDemoMode() {
   const params = new URLSearchParams(window.location.search);
   const isDemo = params.get("demo") === "true";
   if (!isDemo) return;
 
-  if ($("name")) $("name").value = "Demo Patient";
+  if ($("patientFirstName")) $("patientFirstName").value = "Demo";
+  if ($("patientLastName")) $("patientLastName").value = "Patient";
+  if ($("firstName")) $("firstName").value = "Demo";
+  if ($("lastName")) $("lastName").value = "Patient";
   if ($("age")) $("age").value = "58";
   if ($("sex")) $("sex").value = "1";
   if ($("cp")) $("cp").value = "4";
@@ -42,7 +51,7 @@ export function initMediTrustPage() {
   const user = getCurrentUser();
 
   setText($("currentUserRole"), user?.role || "Clinician");
-  setText($("currentUserName"), user?.full_name || user?.email || "Signed in user");
+  setText($("currentUserName"), getDisplayName(user) || "Signed in user");
 
   $("logoutBtn")?.addEventListener("click", logout);
 

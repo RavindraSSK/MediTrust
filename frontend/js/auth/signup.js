@@ -1,4 +1,9 @@
-import { renderPasswordRules } from "./password-rules.js";
+import {
+  renderPasswordRules,
+  isPasswordValid,
+  getPasswordValidationMessage,
+} from "./password-rules.js?v=20260418f";
+import { attachPasswordToggle } from "./password-toggle.js?v=20260418f";
 
 const API_BASE = "http://127.0.0.1:8000";
 
@@ -10,28 +15,34 @@ export function initSignupPage() {
 
   if (!signupForm) return;
 
+  attachPasswordToggle("password", "toggleSignupPassword", "signupEyeOpenIcon", "signupEyeClosedIcon");
+  attachPasswordToggle("confirmPassword", "toggleSignupConfirmPassword", "signupConfirmEyeOpenIcon", "signupConfirmEyeClosedIcon");
+
   passwordInput?.addEventListener("input", () => {
     renderPasswordRules(rulesBox, passwordInput.value);
   });
+
+  renderPasswordRules(rulesBox, passwordInput?.value || "");
 
   signupForm.addEventListener("submit", async (e) => {
     e.preventDefault();
     signupMessage.textContent = "";
 
-    const fullName = document.getElementById("fullName").value.trim();
+    const firstName = document.getElementById("firstName").value.trim();
+    const lastName = document.getElementById("lastName").value.trim();
     const email = document.getElementById("email").value.trim();
     const role = document.getElementById("role").value.trim();
     const hospitalName = document.getElementById("hospitalName").value.trim();
     const password = document.getElementById("password").value.trim();
     const confirmPassword = document.getElementById("confirmPassword").value.trim();
 
-    if (!fullName || !email || !role || !password || !confirmPassword) {
+    if (!firstName || !lastName || !email || !role || !password || !confirmPassword) {
       signupMessage.textContent = "Please complete all required fields.";
       return;
     }
 
-    if (password.length < 8) {
-      signupMessage.textContent = "Password must be at least 8 characters.";
+    if (!isPasswordValid(password)) {
+      signupMessage.textContent = getPasswordValidationMessage(password);
       return;
     }
 
@@ -47,7 +58,8 @@ export function initSignupPage() {
           "Content-Type": "application/json"
         },
         body: JSON.stringify({
-          full_name: fullName,
+          first_name: firstName,
+          last_name: lastName,
           email,
           password,
           role,

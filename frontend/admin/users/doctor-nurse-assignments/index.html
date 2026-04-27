@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>MediTrust | Doctor-Nurse Assignments</title>
+  <link rel="stylesheet" href="../../../css/style.css" />
+</head>
+<body class="dashboard-page admin-fixed-page">
+  <div class="page-bg"></div>
+  <div class="page-overlay"></div>
+
+  <main class="dashboard-shell">
+    <section class="dashboard-card">
+      <header class="dashboard-header">
+        <div>
+          <h1 class="dashboard-title">Doctor-Nurse Assignments</h1>
+          <p class="dashboard-subtitle">Assign nurses to one or more doctors</p>
+        </div>
+        <div class="dashboard-user-box">
+          <span id="adminUserName">Loading...</span>
+          <a class="mini-btn" href="../">Back to User Management</a>
+          <button id="logoutBtn" class="mini-btn">Logout</button>
+        </div>
+      </header>
+
+      <section class="panel-box wide-panel admin-management-panel" id="adminManagementPanel">
+        <div class="admin-panel-header">
+          <div>
+            <h2>Assignments</h2>
+            <p id="adminManagementMessage" class="admin-message"></p>
+          </div>
+          <button class="mini-btn" id="refreshAdminUsersBtn" type="button">Refresh</button>
+        </div>
+
+        <form id="assignmentForm" class="assignment-form">
+          <select id="doctorSelect" class="admin-select" required>
+            <option value="">Select doctor</option>
+          </select>
+          <select id="nurseSelect" class="admin-select" required>
+            <option value="">Select nurse</option>
+          </select>
+          <button class="action-btn" id="assignNurseBtn" type="submit">Assign Nurse</button>
+        </form>
+
+        <input id="adminSearchInput" class="admin-search" type="search" placeholder="Search by doctor or nurse name/email" />
+
+        <div class="admin-table-wrap admin-scroll-list">
+          <table class="admin-table">
+            <thead>
+              <tr>
+                <th>Doctor</th>
+                <th>Nurse</th>
+                <th>Assigned</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="assignmentsTable">
+              <tr><td colspan="4">Loading assignments...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </section>
+  </main>
+
+  <script type="module">
+    import { initDoctorNurseAssignmentsPage } from "../../../js/admin-user-management.js?v=20260427b";
+    initDoctorNurseAssignmentsPage();
+  </script>
+</body>
+</html>

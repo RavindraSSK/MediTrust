@@ -6,7 +6,7 @@
   <title>MediTrust | Risk Assessment</title>
 
   <link rel="stylesheet" href="css/meditrust.css" />
-  <script type="module" src="js/script.js"></script>
+  <script type="module" src="js/script.js?v=20260418f"></script>
 </head>
 
 <body>
@@ -27,6 +27,7 @@
           </div>
 
           <div class="actions">
+            <a href="patients.html" class="btn-secondary result-link-btn">Patients</a>
             <button id="logoutBtn" class="btn-secondary" type="button">Logout</button>
           </div>
         </div>
@@ -52,8 +53,14 @@
 
           <div class="row">
             <div>
-              <label for="name">Patient name <span class="required-star">*</span></label>
-              <input id="name" placeholder="e.g., Ravi Kumar" autocomplete="off" />
+              <label for="patientFirstName">Patient first name <span class="required-star">*</span></label>
+              <input id="patientFirstName" placeholder="e.g., Ravi" autocomplete="off" />
+              <span class="hint">Used for on-screen patient identification only.</span>
+            </div>
+
+            <div>
+              <label for="patientLastName">Patient last name <span class="required-star">*</span></label>
+              <input id="patientLastName" placeholder="e.g., Kumar" autocomplete="off" />
               <span class="hint">Used for on-screen patient identification only.</span>
             </div>
 

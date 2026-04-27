@@ -1,28 +1,17 @@
+import { storeCurrentUser } from "./session.js?v=20260418f";
+import { attachPasswordToggle } from "./password-toggle.js?v=20260418f";
 const API_BASE = "http://127.0.0.1:8000";
 
 export function initLoginPage() {
   const loginForm = document.getElementById("loginForm");
   const loginBtn = document.getElementById("loginBtn");
   const loginMessage = document.getElementById("loginMessage");
-  const togglePassword = document.getElementById("togglePassword");
   const passwordInput = document.getElementById("password");
-  const eyeOpenIcon = document.getElementById("eyeOpenIcon");
-  const eyeClosedIcon = document.getElementById("eyeClosedIcon");
   const demoBtn = document.querySelector(".explore-demo");
 
   if (!loginForm || !loginBtn || !passwordInput) return;
 
-  if (togglePassword) {
-    togglePassword.addEventListener("click", () => {
-      const isPassword = passwordInput.type === "password";
-      passwordInput.type = isPassword ? "text" : "password";
-
-      if (eyeOpenIcon && eyeClosedIcon) {
-        eyeOpenIcon.classList.toggle("hidden-icon", isPassword);
-        eyeClosedIcon.classList.toggle("hidden-icon", !isPassword);
-      }
-    });
-  }
+  attachPasswordToggle("password", "togglePassword", "eyeOpenIcon", "eyeClosedIcon");
 
   if (demoBtn) {
     demoBtn.addEventListener("click", () => {
@@ -67,7 +56,7 @@ export function initLoginPage() {
         return;
       }
 
-      localStorage.setItem("meditrust_user", JSON.stringify(data));
+      storeCurrentUser(data);
 
       if (data.role === "Doctor") {
         window.location.href = "doctor-dashboard.html";

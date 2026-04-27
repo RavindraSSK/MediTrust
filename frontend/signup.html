@@ -23,9 +23,16 @@
 
       <form id="signupForm" class="login-form" novalidate>
         <div class="field">
-          <label for="fullName">Full Name</label>
+          <label for="firstName">First Name</label>
           <div class="input-wrap">
-            <input type="text" id="fullName" placeholder="Enter your full name" required />
+            <input type="text" id="firstName" placeholder="Enter your first name" required />
+          </div>
+        </div>
+
+        <div class="field">
+          <label for="lastName">Last Name</label>
+          <div class="input-wrap">
+            <input type="text" id="lastName" placeholder="Enter your last name" required />
           </div>
         </div>
 
@@ -59,6 +66,18 @@
           <label for="password">Password</label>
           <div class="input-wrap">
             <input type="password" id="password" placeholder="Minimum 8 characters" required />
+            <button type="button" id="toggleSignupPassword" class="password-toggle" aria-label="Toggle password visibility">
+              <svg id="signupEyeOpenIcon" viewBox="0 0 24 24" fill="none">
+                <path d="M2 12C4.2 7.8 7.8 5 12 5C16.2 5 19.8 7.8 22 12C19.8 16.2 16.2 19 12 19C7.8 19 4.2 16.2 2 12Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/>
+                <circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="1.8"/>
+              </svg>
+              <svg id="signupEyeClosedIcon" viewBox="0 0 24 24" fill="none" class="hidden-icon">
+                <path d="M3 3L21 21" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+                <path d="M10.6 6.3C11.06 6.1 11.53 6 12 6C16.2 6 19.8 8.8 22 13C21.15 14.62 20.05 15.95 18.74 16.93" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+                <path d="M14.12 14.12C13.58 14.66 12.82 15 12 15C10.34 15 9 13.66 9 12C9 11.18 9.34 10.42 9.88 9.88" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+                <path d="M6.06 9.26C4.75 10.23 3.66 11.52 2.82 13C5.02 17.2 8.4 20 12 20C13.96 20 15.81 19.17 17.38 17.74" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+            </button>
           </div>
           <div id="passwordRules" class="password-rules"></div>
         </div>
@@ -67,6 +86,18 @@
           <label for="confirmPassword">Confirm Password</label>
           <div class="input-wrap">
             <input type="password" id="confirmPassword" placeholder="Re-enter your password" required />
+            <button type="button" id="toggleSignupConfirmPassword" class="password-toggle" aria-label="Toggle confirm password visibility">
+              <svg id="signupConfirmEyeOpenIcon" viewBox="0 0 24 24" fill="none">
+                <path d="M2 12C4.2 7.8 7.8 5 12 5C16.2 5 19.8 7.8 22 12C19.8 16.2 16.2 19 12 19C7.8 19 4.2 16.2 2 12Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/>
+                <circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="1.8"/>
+              </svg>
+              <svg id="signupConfirmEyeClosedIcon" viewBox="0 0 24 24" fill="none" class="hidden-icon">
+                <path d="M3 3L21 21" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+                <path d="M10.6 6.3C11.06 6.1 11.53 6 12 6C16.2 6 19.8 8.8 22 13C21.15 14.62 20.05 15.95 18.74 16.93" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+                <path d="M14.12 14.12C13.58 14.66 12.82 15 12 15C10.34 15 9 13.66 9 12C9 11.18 9.34 10.42 9.88 9.88" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+                <path d="M6.06 9.26C4.75 10.23 3.66 11.52 2.82 13C5.02 17.2 8.4 20 12 20C13.96 20 15.81 19.17 17.38 17.74" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+            </button>
           </div>
         </div>
 
@@ -86,6 +117,6 @@
     </section>
   </main>
 
-  <script type="module" src="js/script.js"></script>
+  <script type="module" src="js/script.js?v=20260418f"></script>
 </body>
 </html>

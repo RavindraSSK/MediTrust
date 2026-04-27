@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>MediTrust | User Management</title>
+  <link rel="stylesheet" href="../../css/style.css" />
+</head>
+<body class="dashboard-page">
+  <div class="page-bg"></div>
+  <div class="page-overlay"></div>
+
+  <main class="dashboard-shell">
+    <section class="dashboard-card">
+      <header class="dashboard-header">
+        <div>
+          <h1 class="dashboard-title">User Management</h1>
+          <p class="dashboard-subtitle">Choose an admin workflow</p>
+        </div>
+        <div class="dashboard-user-box">
+          <span id="adminUserName">Loading...</span>
+          <a class="mini-btn" href="../../admin-dashboard.html">Back to Dashboard</a>
+          <button id="logoutBtn" class="mini-btn">Logout</button>
+        </div>
+      </header>
+
+      <section class="panel-box wide-panel">
+        <div class="user-management-hub">
+          <button class="action-btn" id="pendingRequestsBtn" type="button">Pending Role Requests</button>
+          <button class="action-btn" id="registeredUsersBtn" type="button">Registered Users</button>
+          <button class="action-btn" id="doctorNurseAssignmentsBtn" type="button">Doctor-Nurse Assignments</button>
+        </div>
+      </section>
+    </section>
+  </main>
+
+  <script>
+    function readCurrentUser() {
+      try {
+        return JSON.parse(localStorage.getItem("meditrust_user") || "{}");
+      } catch {
+        return {};
+      }
+    }
+
+    function getLoginPagePath() {
+      const frontendMarker = "/frontend/";
+      const markerIndex = window.location.pathname.indexOf(frontendMarker);
+      if (markerIndex >= 0) {
+        return `${window.location.pathname.slice(0, markerIndex)}${frontendMarker}index.html`;
+      }
+
+      return "/index.html";
+    }
+
+    const user = readCurrentUser();
+    const fallbackRole = localStorage.getItem("mt_user_role") || "";
+    const role = user.role || fallbackRole;
+
+    if (!user.ok || role !== "Admin") {
+      window.location.href = getLoginPagePath();
+    } else {
+      const fullName = user.full_name || localStorage.getItem("mt_user_name") || "";
+      const displayName = [user.first_name, user.last_name].filter(Boolean).join(" ").trim()
+        || fullName
+        || user.email
+        || "Admin";
+
+      document.getElementById("adminUserName").textContent = displayName;
+
+      document.getElementById("logoutBtn").addEventListener("click", () => {
+        localStorage.removeItem("meditrust_user");
+        localStorage.removeItem("mt_user_email");
+        localStorage.removeItem("mt_user_role");
+        localStorage.removeItem("mt_user_name");
+        window.location.href = getLoginPagePath();
+      });
+
+      document.getElementById("pendingRequestsBtn").addEventListener("click", () => {
+        window.location.href = "pending-requests/";
+      });
+      document.getElementById("registeredUsersBtn").addEventListener("click", () => {
+        window.location.href = "registered-users/";
+      });
+      document.getElementById("doctorNurseAssignmentsBtn").addEventListener("click", () => {
+        window.location.href = "doctor-nurse-assignments/";
+      });
+    }
+  </script>
+</body>
+</html>
