@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, Float, String, DateTime
+from sqlalchemy import Column, Integer, Float, String, DateTime, ForeignKey, UniqueConstraint
 from sqlalchemy.sql import func
 from .db import Base
 
@@ -25,7 +25,20 @@ class User(Base):
     email = Column(String, unique=True, index=True, nullable=False)
     password_hash = Column(String, nullable=False)
     role = Column(String, nullable=False, default="Doctor")
+    role_status = Column(String, nullable=False, default="pending")
     hospital_name = Column(String, nullable=True)
+
+
+class DoctorNurseAssignment(Base):
+    __tablename__ = "doctor_nurse_assignments"
+    __table_args__ = (
+        UniqueConstraint("doctor_id", "nurse_id", name="uq_doctor_nurse_assignment"),
+    )
+
+    id = Column(Integer, primary_key=True, index=True)
+    doctor_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    nurse_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
 
 
 class PredictionLog(Base):

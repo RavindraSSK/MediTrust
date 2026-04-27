@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>MediTrust | Pending Role Requests</title>
+  <link rel="stylesheet" href="../../../css/style.css" />
+</head>
+<body class="dashboard-page admin-fixed-page">
+  <div class="page-bg"></div>
+  <div class="page-overlay"></div>
+
+  <main class="dashboard-shell">
+    <section class="dashboard-card">
+      <header class="dashboard-header">
+        <div>
+          <h1 class="dashboard-title">Pending Role Requests</h1>
+          <p class="dashboard-subtitle">Review and approve requested access</p>
+        </div>
+        <div class="dashboard-user-box">
+          <span id="adminUserName">Loading...</span>
+          <a class="mini-btn" href="../">Back to User Management</a>
+          <button id="logoutBtn" class="mini-btn">Logout</button>
+        </div>
+      </header>
+
+      <section class="panel-box wide-panel admin-management-panel" id="adminManagementPanel">
+        <div class="admin-panel-header">
+          <div>
+            <h2>Pending Requests</h2>
+            <p id="adminManagementMessage" class="admin-message"></p>
+          </div>
+          <button class="mini-btn" id="refreshAdminUsersBtn" type="button">Refresh</button>
+        </div>
+
+        <input id="adminSearchInput" class="admin-search" type="search" placeholder="Search by name, email, or requested role" />
+
+        <div class="admin-table-wrap admin-scroll-list">
+          <table class="admin-table">
+            <thead>
+              <tr>
+                <th>Name</th>
+                <th>Email</th>
+                <th>Requested Role</th>
+                <th>Status</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="pendingUsersTable">
+              <tr><td colspan="5">Loading requests...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </section>
+  </main>
+
+  <script type="module">
+    import { initPendingRequestsPage } from "../../../js/admin-user-management.js?v=20260427b";
+    initPendingRequestsPage();
+  </script>
+</body>
+</html>

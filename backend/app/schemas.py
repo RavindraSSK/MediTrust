@@ -58,6 +58,19 @@ class ChangePasswordIn(BaseModel):
     new_password: str
 
 
+class AdminRoleUpdateIn(BaseModel):
+    role: str
+
+
+class AdminRoleStatusUpdateIn(BaseModel):
+    role_status: str
+
+
+class DoctorNurseAssignmentIn(BaseModel):
+    doctor_id: int
+    nurse_id: int
+
+
 class PredictRequest(BaseModel):
     first_name: str
     last_name: str

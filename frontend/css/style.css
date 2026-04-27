@@ -533,6 +533,7 @@ a {
   color: #ffffff;
   background: linear-gradient(180deg, var(--btn-top), var(--btn-bottom));
   font-weight: 700;
+  text-decoration: none;
 }
 
 .stats-grid {
@@ -650,14 +651,191 @@ a {
   font-weight: 600;
 }
 
+.admin-management-panel[hidden] {
+  display: none;
+}
+
+.admin-fixed-page {
+  height: 100vh;
+  min-height: 100vh;
+  overflow: hidden;
+  padding: 20px 16px;
+}
+
+.admin-fixed-page .dashboard-shell {
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
+  padding: 0;
+}
+
+.admin-fixed-page .dashboard-card {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.admin-fixed-page .admin-management-panel {
+  min-height: 0;
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.admin-panel-header,
+.assignment-form,
+.admin-action-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.admin-panel-header {
+  justify-content: space-between;
+  margin-bottom: 18px;
+}
+
+.admin-message {
+  color: #dceaf6;
+  font-size: 0.95rem;
+  margin-top: 4px;
+}
+
+.admin-message-error {
+  color: #ffd6d6;
+}
+
+.admin-subsection {
+  margin-top: 20px;
+}
+
+.admin-subsection h3 {
+  color: #ffffff;
+  font-size: 1.05rem;
+  margin-bottom: 10px;
+}
+
+.user-management-hub {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.admin-search {
+  width: 100%;
+  border: none;
+  border-radius: 10px;
+  padding: 13px 14px;
+  margin-bottom: 14px;
+  color: var(--input-text);
+  background: rgba(255, 255, 255, 0.92);
+  font-size: 0.98rem;
+  font-weight: 700;
+}
+
+.admin-scroll-list {
+  min-height: 0;
+  flex: 1;
+  overflow-x: auto;
+  overflow-y: auto;
+}
+
+.admin-table-wrap {
+  overflow-x: auto;
+}
+
+.admin-fixed-page .admin-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: rgba(35, 87, 139, 0.96);
+}
+
+.admin-table {
+  width: 100%;
+  border-collapse: collapse;
+  color: #eef7ff;
+}
+
+.admin-table th,
+.admin-table td {
+  padding: 12px;
+  text-align: left;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+  vertical-align: middle;
+}
+
+.admin-table th {
+  color: #ffffff;
+  font-size: 0.9rem;
+}
+
+.admin-table td,
+.admin-table span {
+  font-size: 0.92rem;
+}
+
+.admin-select {
+  min-width: 140px;
+  border: none;
+  border-radius: 10px;
+  padding: 10px 12px;
+  color: var(--input-text);
+  background: rgba(255, 255, 255, 0.92);
+  font-weight: 700;
+}
+
+.admin-row-btn {
+  padding: 8px 12px;
+  border-radius: 9px;
+}
+
+.admin-row-btn:disabled,
+.admin-select:disabled,
+.action-btn:disabled,
+.mini-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.status-pill {
+  display: inline-flex;
+  border-radius: 999px;
+  padding: 5px 9px;
+  color: #ffffff;
+  font-weight: 800;
+  text-transform: capitalize;
+}
+
+.status-approved {
+  background: rgba(22, 163, 74, 0.78);
+}
+
+.status-pending {
+  background: rgba(217, 119, 6, 0.82);
+}
+
+.status-rejected {
+  background: rgba(220, 38, 38, 0.78);
+}
+
 @media (max-width: 900px) {
   .stats-grid,
   .dashboard-grid,
-  .scope-grid {
+  .scope-grid,
+  .user-management-hub {
     grid-template-columns: 1fr;
   }
 
   .dashboard-header {
+    flex-direction: column;
+  }
+
+  .admin-panel-header,
+  .assignment-form,
+  .admin-action-row {
+    align-items: stretch;
     flex-direction: column;
   }
 }
