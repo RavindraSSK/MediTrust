@@ -1123,6 +1123,7 @@ input:focus, select:focus{
   display: flex;
   flex-direction: column;
   gap: 10px;
+  margin-bottom: 18px;
 }
 
 .waterfall-row {
@@ -1143,6 +1144,28 @@ input:focus, select:focus{
 
 .waterfall-shift {
   font-weight: 700;
+}
+
+.waterfall-final {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 10px;
+  margin-bottom: 0;
+  padding: 14px 16px;
+  border-radius: 14px;
+  border: 1px solid #c9dbef;
+  background: linear-gradient(180deg, #f8fbff, #edf5ff);
+  box-shadow: var(--shadowSoft);
+  font-size: 1rem;
+  font-weight: 700;
+}
+
+.waterfall-final strong {
+  display: inline;
+  margin-bottom: 0;
+  color: #12355b;
 }
 
 .wf-up {

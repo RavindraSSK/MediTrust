@@ -3,11 +3,11 @@ import { pickId, setText, show, safeNumber } from "../utils.js";
 function getClinicalFeatureLabel(feature) {
   const labels = {
     age: "age",
-    chol: "total cholesterol",
+    chol: "cholesterol",
     trestbps: "resting blood pressure",
-    oldpeak: "exercise-induced ST depression",
+    oldpeak: "ST depression",
     exang: "exercise-induced angina",
-    thalach: "maximum heart rate achieved",
+    thalach: "maximum heart rate",
     ca: "major vessel involvement",
     thal: "thallium stress test result",
     cp: "chest pain pattern",
@@ -17,6 +17,64 @@ function getClinicalFeatureLabel(feature) {
     sex: "sex"
   };
   return labels[feature] || feature;
+}
+
+function getRiskDirectionText(direction) {
+  const normalized = String(direction || "").toLowerCase();
+
+  if (normalized.includes("decrease")) {
+    return "Decreases risk";
+  }
+
+  if (normalized.includes("increase")) {
+    return "Increases risk";
+  }
+
+  return "Affects risk";
+}
+
+function formatFeatureList(features) {
+  const labels = [...new Set(features.map((item) => getClinicalFeatureLabel(item.feature)).filter(Boolean))];
+
+  if (!labels.length) return "";
+  if (labels.length === 1) return labels[0];
+  if (labels.length === 2) return `${labels[0]} and ${labels[1]}`;
+
+  return `${labels.slice(0, -1).join(", ")}, and ${labels[labels.length - 1]}`;
+}
+
+function buildClinicalExplanation(riskLevel, features) {
+  const intro =
+    riskLevel === "High"
+      ? "This result indicates a high cardiovascular risk."
+      : riskLevel === "Medium"
+        ? "This result indicates a moderate cardiovascular risk."
+        : riskLevel === "Low"
+          ? "This result indicates a low cardiovascular risk."
+          : "This result reflects the current cardiovascular risk assessment.";
+
+  const increasing = features.filter((item) => getRiskDirectionText(item.direction) === "Increases risk").slice(0, 2);
+  const decreasing = features.filter((item) => getRiskDirectionText(item.direction) === "Decreases risk").slice(0, 2);
+
+  let factorSentence = "";
+
+  if (increasing.length && decreasing.length) {
+    factorSentence = `Key factors such as ${formatFeatureList(increasing)} increased the risk, while ${formatFeatureList(decreasing)} helped lower it.`;
+  } else if (increasing.length) {
+    factorSentence = `Key factors such as ${formatFeatureList(increasing)} increased the risk.`;
+  } else if (decreasing.length) {
+    factorSentence = `Key factors such as ${formatFeatureList(decreasing)} contributed to lowering the risk.`;
+  } else if (features.length) {
+    factorSentence = `Key factors included ${formatFeatureList(features.slice(0, 3))}.`;
+  }
+
+  return [
+    intro,
+    factorSentence,
+    "This result should be interpreted along with clinical examination and symptoms.",
+  ]
+    .filter(Boolean)
+    .join(" ");
 }
 
 function renderContributionBars(features) {
@@ -196,23 +254,21 @@ export function renderRiskResult(data) {
   renderWorkflowNotice(data);
 
   if (explanationSec) {
-    const topFeatures = data.top_features || [];
+    const topFeatures = (data.top_features || []).slice(0, 4);
     const allFeatures = data.all_features || [];
     const baseValue = safeNumber(data.base_value) ?? 0;
-    const summaryText =
-      data.gemini_summary || data.explanation_summary || "No detailed explanation is available for this prediction.";
+    const summaryText = buildClinicalExplanation(riskLevel, topFeatures);
 
     const factorListHtml = topFeatures
       .map((item) => {
-        const toneClass =
-          item.direction === "increases risk" ? "risk-up" : "risk-down";
+        const directionText = getRiskDirectionText(item.direction);
+        const toneClass = directionText === "Increases risk" ? "risk-up" : "risk-down";
 
         return `
           <li class="${toneClass}">
             <strong>${getClinicalFeatureLabel(item.feature)}</strong>
             <div class="clinical-factor-text">
-              ${getClinicalFeatureLabel(item.feature)} contributed ${item.direction === "increases risk" ? "to a higher" : "to a lower"} estimated risk
-              (observed value: ${item.value}, SHAP impact: ${item.impact.toFixed(3)})
+              ${directionText}
             </div>
           </li>
         `;
@@ -237,7 +293,7 @@ export function renderRiskResult(data) {
           }
 
           <p class="clinical-conclusion">
-            Clinical Summary: Overall, the current pattern should be interpreted together with symptoms, examination findings, and clinician judgement.
+            This result should be interpreted along with clinical examination and symptoms.
           </p>
 
           ${barsHtml}
