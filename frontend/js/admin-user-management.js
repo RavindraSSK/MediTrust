@@ -11,7 +11,7 @@ import {
   formatDateTime
 } from "./dashboard.js";
 
-const roles = ["Doctor", "Nurse", "Admin", "Patient"];
+const roles = ["Doctor", "Nurse", "Admin"];
 let currentUser = null;
 let users = [];
 let assignments = [];
