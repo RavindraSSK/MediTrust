@@ -1,6 +1,15 @@
 fastapi
 uvicorn[standard]
+gunicorn
 SQLAlchemy
 psycopg2-binary
 python-dotenv
+passlib
+bcrypt
+scikit-learn
+joblib
+numpy
+pandas
+shap
 google-genai
+email-validator
