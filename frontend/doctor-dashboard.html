@@ -78,8 +78,9 @@
     const user = getCurrentUser("Doctor");
     if (!user) throw new Error("Unauthorized");
 
+    const doctorName = [user.first_name, user.last_name].filter(Boolean).join(" ").trim() || user.full_name;
     document.getElementById("doctorUserName").textContent =
-      user.full_name ? `Dr. ${user.full_name}` : "Doctor";
+      doctorName ? `Dr. ${doctorName}` : "Doctor";
 
     attachLogout();
 

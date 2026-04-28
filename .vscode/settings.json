@@ -1,0 +1,12 @@
+{
+  "liveServer.settings.ignoreFiles": [
+    "**/.git/**",
+    "**/.venv/**",
+    "**/__pycache__/**",
+    "**/*.pyc",
+    "**/backend/**",
+    "**/ml/**",
+    "**/runlocal_*.log",
+    "**/uvicorn_*.log"
+  ]
+}

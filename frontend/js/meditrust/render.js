@@ -3,11 +3,11 @@ import { pickId, setText, show, safeNumber } from "../utils.js";
 function getClinicalFeatureLabel(feature) {
   const labels = {
     age: "age",
-    chol: "total cholesterol",
+    chol: "cholesterol",
     trestbps: "resting blood pressure",
-    oldpeak: "exercise-induced ST depression",
+    oldpeak: "ST depression",
     exang: "exercise-induced angina",
-    thalach: "maximum heart rate achieved",
+    thalach: "maximum heart rate",
     ca: "major vessel involvement",
     thal: "thallium stress test result",
     cp: "chest pain pattern",
@@ -17,6 +17,289 @@ function getClinicalFeatureLabel(feature) {
     sex: "sex"
   };
   return labels[feature] || feature;
+}
+
+function getRiskDirectionText(direction) {
+  const normalized = String(direction || "").toLowerCase();
+
+  if (normalized.includes("decrease")) {
+    return "Decreases risk";
+  }
+
+  if (normalized.includes("increase")) {
+    return "Increases risk";
+  }
+
+  return "Affects risk";
+}
+
+function capitalizeFirst(text) {
+  if (!text) return "";
+  return text.charAt(0).toUpperCase() + text.slice(1);
+}
+
+function formatClinicalNumber(value, digits = 1) {
+  const numeric = safeNumber(value);
+  if (numeric === null) return null;
+  if (Number.isInteger(numeric)) return String(numeric);
+  return numeric.toFixed(digits).replace(/\.0$/, "");
+}
+
+function formatFeatureList(features) {
+  const labels = [...new Set(features.map((item) => getClinicalFeatureLabel(item.feature)).filter(Boolean))];
+
+  if (!labels.length) return "";
+  if (labels.length === 1) return labels[0];
+  if (labels.length === 2) return `${labels[0]} and ${labels[1]}`;
+
+  return `${labels.slice(0, -1).join(", ")}, and ${labels[labels.length - 1]}`;
+}
+
+function buildClinicalExplanation(riskLevel, features) {
+  const intro =
+    riskLevel === "High"
+      ? "This result indicates a high cardiovascular risk."
+      : riskLevel === "Medium"
+        ? "This result indicates a moderate cardiovascular risk."
+        : riskLevel === "Low"
+          ? "This result indicates a low cardiovascular risk."
+          : "This result reflects the current cardiovascular risk assessment.";
+
+  const increasing = features.filter((item) => getRiskDirectionText(item.direction) === "Increases risk").slice(0, 2);
+  const decreasing = features.filter((item) => getRiskDirectionText(item.direction) === "Decreases risk").slice(0, 2);
+
+  let factorSentence = "";
+
+  if (increasing.length && decreasing.length) {
+    factorSentence = `Key factors such as ${formatFeatureList(increasing)} increased the risk, while ${formatFeatureList(decreasing)} helped lower it.`;
+  } else if (increasing.length) {
+    factorSentence = `Key factors such as ${formatFeatureList(increasing)} increased the risk.`;
+  } else if (decreasing.length) {
+    factorSentence = `Key factors such as ${formatFeatureList(decreasing)} contributed to lowering the risk.`;
+  } else if (features.length) {
+    factorSentence = `Key factors included ${formatFeatureList(features.slice(0, 3))}.`;
+  }
+
+  return [
+    intro,
+    factorSentence,
+  ]
+    .filter(Boolean)
+    .join(" ");
+}
+
+function getCategoricalValueLabel(feature, value) {
+  const numeric = safeNumber(value);
+  if (numeric === null) return null;
+
+  const rounded = Math.round(numeric);
+  const labelsByFeature = {
+    cp: {
+      1: "typical angina",
+      2: "atypical angina",
+      3: "non-anginal pain",
+      4: "asymptomatic",
+    },
+    restecg: {
+      0: "normal",
+      1: "ST-T abnormality",
+      2: "left ventricular hypertrophy pattern",
+    },
+    slope: {
+      1: "upsloping",
+      2: "flat",
+      3: "downsloping",
+    },
+    thal: {
+      3: "normal",
+      6: "fixed defect",
+      7: "reversible defect",
+    },
+    sex: {
+      0: "female",
+      1: "male",
+    },
+  };
+
+  return labelsByFeature[feature]?.[rounded] || null;
+}
+
+function buildDirectionFallback(label, directionText) {
+  if (directionText === "Increases risk") {
+    return `${capitalizeFirst(label)} may be associated with higher cardiovascular concern in this assessment.`;
+  }
+
+  if (directionText === "Decreases risk") {
+    return `${capitalizeFirst(label)} may be associated with lower cardiovascular concern in this assessment.`;
+  }
+
+  return `${capitalizeFirst(label)} should be interpreted in the overall clinical context.`;
+}
+
+// These ranges are based on common U.S. clinical reference categories for plain-language explanation
+// and should not replace medical judgement or individualized clinical assessment.
+function buildFeatureExplanation(item) {
+  const feature = item?.feature;
+  const value = safeNumber(item?.value);
+  const directionText = getRiskDirectionText(item?.direction);
+  const label = getClinicalFeatureLabel(feature);
+
+  if (feature === "trestbps" && value !== null) {
+    const formatted = formatClinicalNumber(value, 0);
+
+    if (value < 120) {
+      return `Resting blood pressure is ${formatted} mmHg, which is within the normal systolic range and may be less supportive of blood pressure-related cardiovascular strain.`;
+    }
+    if (value <= 129) {
+      return `Resting blood pressure is ${formatted} mmHg, which is in the elevated range and can add to cardiovascular strain over time.`;
+    }
+    if (value <= 139) {
+      return `Resting blood pressure is ${formatted} mmHg, which falls in the stage 1 hypertension range and can increase workload on the heart and blood vessels.`;
+    }
+    return `Resting blood pressure is ${formatted} mmHg, which falls in the stage 2 hypertension range and can place extra strain on the heart and blood vessels.`;
+  }
+
+  if (feature === "chol" && value !== null) {
+    const formatted = formatClinicalNumber(value, 0);
+
+    if (value < 200) {
+      return `Cholesterol is ${formatted} mg/dL, which is within the desirable range and may be less supportive of plaque buildup in the arteries.`;
+    }
+    if (value <= 239) {
+      return `Cholesterol is ${formatted} mg/dL, which is in the borderline high range and may contribute to cardiovascular strain over time.`;
+    }
+    return `Cholesterol is ${formatted} mg/dL, which is in the high range and may contribute to plaque buildup in arteries.`;
+  }
+
+  if (feature === "fbs" && value !== null) {
+    if (Math.round(value) === 1) {
+      return "Fasting blood sugar is flagged as elevated, which may reflect impaired glucose regulation and can add to cardiovascular risk.";
+    }
+    if (Math.round(value) === 0) {
+      return "Fasting blood sugar is not flagged as elevated, which is less supportive of glucose-related cardiovascular strain in this assessment.";
+    }
+  }
+
+  if (feature === "age" && value !== null) {
+    const formatted = formatClinicalNumber(value, 0);
+
+    if (value < 40) {
+      return `Age is ${formatted} years, which falls in a lower baseline risk group and may be associated with lower age-related cardiovascular risk.`;
+    }
+    if (value <= 59) {
+      return `Age is ${formatted} years, which falls in a moderate age-related risk group and can contribute to cardiovascular risk in the right clinical context.`;
+    }
+    return `Age is ${formatted} years, which falls in a higher age-related risk group and may contribute to greater cardiovascular vulnerability.`;
+  }
+
+  if (feature === "exang" && value !== null) {
+    if (Math.round(value) === 1) {
+      return "Exercise-induced angina is present, which may suggest exertional cardiac stress and supports closer clinical review.";
+    }
+    if (Math.round(value) === 0) {
+      return "Exercise-induced angina is absent, which is less supportive of exercise-related ischemic symptoms in this assessment.";
+    }
+  }
+
+  if (feature === "ca" && value !== null) {
+    const rounded = Math.round(value);
+    if (rounded <= 0) {
+      return "Major vessel involvement is recorded as 0, which does not indicate major vessel involvement in this assessment.";
+    }
+    if (rounded === 1) {
+      return "Major vessel involvement is recorded as 1, which may indicate some vessel involvement and is associated with higher cardiovascular concern.";
+    }
+    return `Major vessel involvement is recorded as ${rounded}, which suggests greater vessel involvement and may support higher cardiovascular concern.`;
+  }
+
+  if (feature === "cp" && value !== null) {
+    const cpLabel = getCategoricalValueLabel(feature, value);
+    if (cpLabel) {
+      if (directionText === "Decreases risk") {
+        return `Chest pain pattern is recorded as ${cpLabel}, which may be less suggestive of higher cardiovascular concern in this assessment.`;
+      }
+      if (directionText === "Increases risk") {
+        return `Chest pain pattern is recorded as ${cpLabel}, which may be associated with higher cardiovascular concern in this assessment.`;
+      }
+      return `Chest pain pattern is recorded as ${cpLabel}, which should be interpreted in the overall clinical context.`;
+    }
+  }
+
+  if (feature === "restecg" && value !== null) {
+    const ecgLabel = getCategoricalValueLabel(feature, value);
+    if (ecgLabel) {
+      if (ecgLabel === "normal") {
+        return "ECG result is recorded as normal, which is less supportive of ECG-related abnormality in this assessment.";
+      }
+      return `ECG result is recorded as ${ecgLabel}, which may reflect cardiac electrical changes and supports closer cardiovascular review.`;
+    }
+  }
+
+  if (feature === "slope" && value !== null) {
+    const slopeLabel = getCategoricalValueLabel(feature, value);
+    if (slopeLabel) {
+      if (directionText === "Decreases risk") {
+        return `ST-segment slope is recorded as ${slopeLabel}, which may be less associated with higher cardiovascular concern in this assessment.`;
+      }
+      if (directionText === "Increases risk") {
+        return `ST-segment slope is recorded as ${slopeLabel}, which can be associated with higher cardiovascular concern in this assessment.`;
+      }
+      return `ST-segment slope is recorded as ${slopeLabel}, which should be interpreted in the overall clinical context.`;
+    }
+  }
+
+  if (feature === "thal" && value !== null) {
+    const thalLabel = getCategoricalValueLabel(feature, value);
+    if (thalLabel) {
+      if (thalLabel === "normal") {
+        return "Thallium stress test result is recorded as normal, which is less supportive of a perfusion-related concern in this assessment.";
+      }
+      return `Thallium stress test result is recorded as ${thalLabel}, which may support closer evaluation of myocardial perfusion.`;
+    }
+  }
+
+  if (feature === "thalach" && value !== null) {
+    const formatted = formatClinicalNumber(value, 0);
+    if (directionText === "Decreases risk") {
+      return `Maximum heart rate is ${formatted} bpm during exercise testing, which may be less suggestive of exercise-related limitation in this assessment.`;
+    }
+    if (directionText === "Increases risk") {
+      return `Maximum heart rate is ${formatted} bpm during exercise testing, which may reflect reduced exercise tolerance in this assessment.`;
+    }
+    return `Maximum heart rate is ${formatted} bpm during exercise testing and should be interpreted in the overall clinical context.`;
+  }
+
+  if (feature === "oldpeak" && value !== null) {
+    const formatted = formatClinicalNumber(value, 1);
+    if (directionText === "Decreases risk") {
+      return `ST depression is ${formatted}, which may be less suggestive of exercise-related cardiac stress in this assessment.`;
+    }
+    if (directionText === "Increases risk") {
+      return `ST depression is ${formatted}, which may reflect more exercise-related cardiac stress in this assessment.`;
+    }
+    return `ST depression is ${formatted} and should be interpreted in the overall clinical context.`;
+  }
+
+  if (feature === "sex" && value !== null) {
+    const sexLabel = getCategoricalValueLabel(feature, value);
+    if (sexLabel) {
+      return `Sex is recorded as ${sexLabel}, which is associated with a different baseline cardiovascular risk pattern in population studies.`;
+    }
+  }
+
+  if (value !== null) {
+    const formatted = formatClinicalNumber(value, 1);
+    if (formatted !== null) {
+      if (directionText === "Increases risk") {
+        return `${capitalizeFirst(label)} is ${formatted}, which may be associated with higher cardiovascular concern in this assessment.`;
+      }
+      if (directionText === "Decreases risk") {
+        return `${capitalizeFirst(label)} is ${formatted}, which may be associated with lower cardiovascular concern in this assessment.`;
+      }
+    }
+  }
+
+  return buildDirectionFallback(label, directionText);
 }
 
 function renderContributionBars(features) {
@@ -196,21 +479,21 @@ export function renderRiskResult(data) {
   renderWorkflowNotice(data);
 
   if (explanationSec) {
-    const topFeatures = data.top_features || [];
+    const topFeatures = (data.top_features || []).slice(0, 4);
     const allFeatures = data.all_features || [];
     const baseValue = safeNumber(data.base_value) ?? 0;
+    const summaryText = buildClinicalExplanation(riskLevel, topFeatures);
 
     const factorListHtml = topFeatures
       .map((item) => {
-        const toneClass =
-          item.direction === "increases risk" ? "risk-up" : "risk-down";
+        const directionText = getRiskDirectionText(item.direction);
+        const toneClass = directionText === "Increases risk" ? "risk-up" : directionText === "Decreases risk" ? "risk-down" : "";
 
         return `
           <li class="${toneClass}">
             <strong>${getClinicalFeatureLabel(item.feature)}</strong>
             <div class="clinical-factor-text">
-              ${getClinicalFeatureLabel(item.feature)} contributed ${item.direction === "increases risk" ? "to a higher" : "to a lower"} estimated risk
-              (observed value: ${item.value}, SHAP impact: ${item.impact.toFixed(3)})
+              ${buildFeatureExplanation(item)}
             </div>
           </li>
         `;
@@ -225,7 +508,7 @@ export function renderRiskResult(data) {
         <div class="explain-box professional-clinical-box">
           <h3>AI Clinical Explanation</h3>
           <p class="clinical-summary-text">
-            ${data.explanation_summary || "No detailed explanation is available for this prediction."}
+            ${summaryText}
           </p>
 
           ${
@@ -235,11 +518,15 @@ export function renderRiskResult(data) {
           }
 
           <p class="clinical-conclusion">
-            Clinical Summary: Overall, the current pattern should be interpreted together with symptoms, examination findings, and clinician judgement.
+            This result should be interpreted along with clinical examination and symptoms.
           </p>
 
           ${barsHtml}
           ${waterfallHtml}
+
+          <p class="hint">
+            Clinical reference ranges are based on commonly accepted guidelines from organizations such as the American Heart Association (AHA) and standard clinical practice.
+          </p>
         </div>
       </div>
     `;

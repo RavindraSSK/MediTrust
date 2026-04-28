@@ -10,6 +10,7 @@ from .schemas import (
     ForgotPasswordIn,
     VerifyResetCodeIn,
     ResetPasswordIn,
+    ChangePasswordIn,
     GenericMessageOut,
 )
 
@@ -23,11 +24,10 @@ def request_reset(data: ForgotPasswordIn, db: Session = Depends(get_db)):
     email = data.email.lower().strip()
     user = db.query(User).filter(User.email == email).first()
 
-    # security-safe response
     if not user:
         return {
-            "ok": True,
-            "message": "If this email exists, a reset code has been sent."
+            "ok": False,
+            "message": "No MediTrust account was found for this email."
         }
 
     code = otp_store.generate_code(email)
@@ -35,7 +35,7 @@ def request_reset(data: ForgotPasswordIn, db: Session = Depends(get_db)):
 
     return {
         "ok": True,
-        "message": "If this email exists, a reset code has been sent."
+        "message": "A 6-digit reset code has been sent to your email."
     }
 
 
@@ -53,12 +53,6 @@ def verify_reset_code(data: VerifyResetCodeIn):
 def reset_password(data: ResetPasswordIn, db: Session = Depends(get_db)):
     email = data.email.lower().strip()
 
-    if len(data.new_password.encode("utf-8")) > 72:
-        return {"ok": False, "message": "Password too long (max 72 characters)."}
-
-    if len(data.new_password) < 8:
-        return {"ok": False, "message": "Password must be at least 8 characters."}
-
     if not otp_store.is_verified(email):
         return {"ok": False, "message": "Reset code verification required."}
 
@@ -71,3 +65,20 @@ def reset_password(data: ResetPasswordIn, db: Session = Depends(get_db)):
     otp_store.clear(email)
 
     return {"ok": True, "message": "Password reset successfully."}
+
+
+@router.post("/change-password", response_model=GenericMessageOut)
+def change_password(data: ChangePasswordIn, db: Session = Depends(get_db)):
+    email = data.email.lower().strip()
+    user = db.query(User).filter(User.email == email).first()
+
+    if not user:
+        return {"ok": False, "message": "User not found."}
+
+    if not pwd_context.verify(data.current_password, user.password_hash):
+        return {"ok": False, "message": "Current password is incorrect."}
+
+    user.password_hash = pwd_context.hash(data.new_password)
+    db.commit()
+
+    return {"ok": True, "message": "Password changed successfully."}

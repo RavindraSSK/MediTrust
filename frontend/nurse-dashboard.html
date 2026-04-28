@@ -73,7 +73,7 @@
     if (!user) throw new Error("Unauthorized");
 
     document.getElementById("nurseUserName").textContent =
-      user.full_name ? user.full_name : "Nurse";
+      [user.first_name, user.last_name].filter(Boolean).join(" ").trim() || user.full_name || "Nurse";
 
     attachLogout();
 

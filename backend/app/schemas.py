@@ -3,7 +3,8 @@ from typing import List, Optional
 
 
 class AssessmentIn(BaseModel):
-    full_name: str
+    first_name: str
+    last_name: str
     age: int
 
 
@@ -14,7 +15,8 @@ class AssessmentOut(BaseModel):
 
 
 class RegisterIn(BaseModel):
-    full_name: str
+    first_name: str
+    last_name: str
     email: EmailStr
     password: str
     role: Optional[str] = "Doctor"
@@ -50,7 +52,28 @@ class ResetPasswordIn(BaseModel):
     new_password: str
 
 
+class ChangePasswordIn(BaseModel):
+    email: EmailStr
+    current_password: str
+    new_password: str
+
+
+class AdminRoleUpdateIn(BaseModel):
+    role: str
+
+
+class AdminRoleStatusUpdateIn(BaseModel):
+    role_status: str
+
+
+class DoctorNurseAssignmentIn(BaseModel):
+    doctor_id: int
+    nurse_id: int
+
+
 class PredictRequest(BaseModel):
+    first_name: str
+    last_name: str
     age: float
     sex: int
     cp: int
@@ -78,6 +101,7 @@ class PredictResponse(BaseModel):
     risk_level: str
     triage_recommendation: str
     explanation_summary: str
+    gemini_summary: str | None = None
     top_features: List[FeatureExplanation]
     all_features: List[FeatureExplanation]
     base_value: float
