@@ -199,6 +199,8 @@ export function renderRiskResult(data) {
     const topFeatures = data.top_features || [];
     const allFeatures = data.all_features || [];
     const baseValue = safeNumber(data.base_value) ?? 0;
+    const summaryText =
+      data.gemini_summary || data.explanation_summary || "No detailed explanation is available for this prediction.";
 
     const factorListHtml = topFeatures
       .map((item) => {
@@ -225,7 +227,7 @@ export function renderRiskResult(data) {
         <div class="explain-box professional-clinical-box">
           <h3>AI Clinical Explanation</h3>
           <p class="clinical-summary-text">
-            ${data.explanation_summary || "No detailed explanation is available for this prediction."}
+            ${summaryText}
           </p>
 
           ${

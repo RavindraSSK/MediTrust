@@ -1,6 +1,6 @@
 import { storeCurrentUser } from "./session.js?v=20260418f";
 import { attachPasswordToggle } from "./password-toggle.js?v=20260418f";
-const API_BASE = "http://127.0.0.1:8000";
+import { API_BASE } from "../config.js";
 
 export function initLoginPage() {
   const loginForm = document.getElementById("loginForm");

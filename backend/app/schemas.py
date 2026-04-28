@@ -101,6 +101,7 @@ class PredictResponse(BaseModel):
     risk_level: str
     triage_recommendation: str
     explanation_summary: str
+    gemini_summary: str | None = None
     top_features: List[FeatureExplanation]
     all_features: List[FeatureExplanation]
     base_value: float

@@ -3,7 +3,10 @@ from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 from sqlalchemy import text
 from passlib.context import CryptContext
+from dotenv import load_dotenv
+import os
 
+load_dotenv()
 from .db import Base, engine, get_db
 from . import models
 from .models import User
@@ -19,7 +22,7 @@ from .schemas import (
     PredictRequest,
     PredictResponse,
 )
-from .ml_service import predict_probability, explain_prediction
+from .ml_service import predict_probability, explain_prediction, generate_gemini_summary
 from .risk import risk_level_from_probability
 from .auth import router as auth_extra_router
 
@@ -57,55 +60,100 @@ def compose_full_name(first_name: str, last_name: str) -> str:
 
 
 def migrate_name_columns():
-    if engine.dialect.name != "sqlite":
-        return
-
     with engine.begin() as conn:
-        for statement in [
-            "ALTER TABLE users ADD COLUMN first_name VARCHAR",
-            "ALTER TABLE users ADD COLUMN last_name VARCHAR",
-            "ALTER TABLE assessments ADD COLUMN first_name VARCHAR",
-            "ALTER TABLE assessments ADD COLUMN last_name VARCHAR",
-            "ALTER TABLE prediction_logs ADD COLUMN first_name VARCHAR",
-            "ALTER TABLE prediction_logs ADD COLUMN last_name VARCHAR",
-            "ALTER TABLE prediction_logs ADD COLUMN full_name VARCHAR",
-            "ALTER TABLE users ADD COLUMN role_status VARCHAR DEFAULT 'approved' NOT NULL",
-        ]:
-            try:
-                conn.execute(text(statement))
-            except Exception:
-                pass
-
-        conn.execute(
-            text("UPDATE users SET role_status = 'approved' WHERE role_status IS NULL OR trim(role_status) = ''")
-        )
-
-        for table_name in ["users", "assessments"]:
-            rows = conn.execute(text(f"PRAGMA table_info({table_name})")).mappings().all()
-            column_names = {row["name"] for row in rows}
-            if "full_name" not in column_names or "first_name" not in column_names or "last_name" not in column_names:
-                continue
+        if engine.dialect.name == "sqlite":
+            for statement in [
+                "ALTER TABLE users ADD COLUMN first_name VARCHAR",
+                "ALTER TABLE users ADD COLUMN last_name VARCHAR",
+                "ALTER TABLE assessments ADD COLUMN first_name VARCHAR",
+                "ALTER TABLE assessments ADD COLUMN last_name VARCHAR",
+                "ALTER TABLE prediction_logs ADD COLUMN first_name VARCHAR",
+                "ALTER TABLE prediction_logs ADD COLUMN last_name VARCHAR",
+                "ALTER TABLE prediction_logs ADD COLUMN full_name VARCHAR",
+                "ALTER TABLE users ADD COLUMN role_status VARCHAR DEFAULT 'approved' NOT NULL",
+            ]:
+                try:
+                    conn.execute(text(statement))
+                except Exception:
+                    pass
 
             conn.execute(
-                text(
-                    f"""
-                    UPDATE {table_name}
-                    SET
-                        first_name = CASE
-                            WHEN instr(trim(full_name), ' ') > 0 THEN substr(trim(full_name), 1, instr(trim(full_name), ' ') - 1)
-                            ELSE trim(full_name)
-                        END,
-                        last_name = CASE
-                            WHEN instr(trim(full_name), ' ') > 0 THEN substr(trim(full_name), instr(trim(full_name), ' ') + 1)
-                            ELSE ''
-                        END
-                    WHERE first_name IS NULL OR trim(first_name) = ''
-                    """
+                text("UPDATE users SET role_status = 'approved' WHERE role_status IS NULL OR trim(role_status) = ''")
+            )
+
+            for table_name in ["users", "assessments"]:
+                rows = conn.execute(text(f"PRAGMA table_info({table_name})")).mappings().all()
+                column_names = {row["name"] for row in rows}
+                if "full_name" not in column_names or "first_name" not in column_names or "last_name" not in column_names:
+                    continue
+
+                conn.execute(
+                    text(
+                        f"""
+                        UPDATE {table_name}
+                        SET
+                            first_name = CASE
+                                WHEN instr(trim(full_name), ' ') > 0 THEN substr(trim(full_name), 1, instr(trim(full_name), ' ') - 1)
+                                ELSE trim(full_name)
+                            END,
+                            last_name = CASE
+                                WHEN instr(trim(full_name), ' ') > 0 THEN substr(trim(full_name), instr(trim(full_name), ' ') + 1)
+                                ELSE ''
+                            END
+                        WHERE first_name IS NULL OR trim(first_name) = ''
+                        """
+                    )
                 )
-            )
+                conn.execute(
+                    text(f"UPDATE {table_name} SET last_name = '' WHERE last_name IS NULL")
+                )
+
+            return
+
+        if engine.dialect.name == "postgresql":
+            for statement in [
+                "ALTER TABLE users ADD COLUMN IF NOT EXISTS first_name VARCHAR",
+                "ALTER TABLE users ADD COLUMN IF NOT EXISTS last_name VARCHAR",
+                "ALTER TABLE users ADD COLUMN IF NOT EXISTS role_status VARCHAR DEFAULT 'approved'",
+                "ALTER TABLE assessments ADD COLUMN IF NOT EXISTS first_name VARCHAR",
+                "ALTER TABLE assessments ADD COLUMN IF NOT EXISTS last_name VARCHAR",
+                "ALTER TABLE prediction_logs ADD COLUMN IF NOT EXISTS full_name VARCHAR",
+                "ALTER TABLE prediction_logs ADD COLUMN IF NOT EXISTS first_name VARCHAR",
+                "ALTER TABLE prediction_logs ADD COLUMN IF NOT EXISTS last_name VARCHAR",
+            ]:
+                conn.execute(text(statement))
+
             conn.execute(
-                text(f"UPDATE {table_name} SET last_name = '' WHERE last_name IS NULL")
+                text("UPDATE users SET role_status = 'approved' WHERE role_status IS NULL OR btrim(role_status) = ''")
             )
+
+            for table_name in ["users", "assessments", "prediction_logs"]:
+                conn.execute(
+                    text(
+                        f"""
+                        UPDATE {table_name}
+                        SET
+                            first_name = CASE
+                                WHEN strpos(btrim(coalesce(full_name, '')), ' ') > 0 THEN split_part(btrim(full_name), ' ', 1)
+                                ELSE btrim(coalesce(full_name, ''))
+                            END,
+                            last_name = CASE
+                                WHEN strpos(btrim(coalesce(full_name, '')), ' ') > 0
+                                    THEN btrim(substr(btrim(full_name), strpos(btrim(full_name), ' ') + 1))
+                                ELSE ''
+                            END
+                        WHERE
+                            full_name IS NOT NULL
+                            AND (
+                                first_name IS NULL OR btrim(first_name) = ''
+                                OR last_name IS NULL
+                            )
+                        """
+                    )
+                )
+                conn.execute(
+                    text(f"UPDATE {table_name} SET last_name = '' WHERE last_name IS NULL")
+                )
 
 
 def serialize_prediction_log(row):
@@ -327,6 +375,13 @@ def predict(req: PredictRequest, db: Session = Depends(get_db)):
     level, msg = risk_level_from_probability(prob)
 
     top_features, all_features, base_value, explanation_summary = explain_prediction(payload, level)
+    gemini_summary = generate_gemini_summary(
+        top_features=top_features,
+        risk_level=level,
+        risk_probability=prob,
+        triage_recommendation=msg,
+        explanation_summary=explanation_summary,
+    )
 
     log = models.PredictionLog(
         full_name=full_name,
@@ -340,11 +395,14 @@ def predict(req: PredictRequest, db: Session = Depends(get_db)):
     db.add(log)
     db.commit()
 
+    print("Returning gemini_summary:", gemini_summary)
+
     return PredictResponse(
         risk_probability=prob,
         risk_level=level,
         triage_recommendation=msg,
         explanation_summary=explanation_summary,
+        gemini_summary=gemini_summary,
         top_features=top_features,
         all_features=all_features,
         base_value=base_value
