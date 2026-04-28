@@ -1,5 +1,5 @@
 import { safeNumber } from "../utils.js?v=20260418f";
-import { predictRisk, assessRisk } from "../services/api.js?v=20260418f";
+import { API_BASE, predictRisk, assessRisk } from "../services/api.js?v=20260418f";
 import { renderError, clearError, renderRiskResult } from "./render.js?v=20260418f";
 import { buildPredictPayload } from "./form.js?v=20260418f";
 
@@ -68,7 +68,7 @@ export async function handlePrediction(elements, currentUser = null) {
     renderRiskResult(data);
   } catch (err) {
     console.error(err);
-    renderError("Unable to reach API. Make sure FastAPI is running on port 8000.");
+    renderError(`Unable to reach API. Make sure FastAPI is running on ${API_BASE}.`);
   } finally {
     if (elements.btn) {
       elements.btn.disabled = false;

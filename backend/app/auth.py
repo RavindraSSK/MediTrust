@@ -24,11 +24,10 @@ def request_reset(data: ForgotPasswordIn, db: Session = Depends(get_db)):
     email = data.email.lower().strip()
     user = db.query(User).filter(User.email == email).first()
 
-    # security-safe response
     if not user:
         return {
-            "ok": True,
-            "message": "If this email exists, a reset code has been sent."
+            "ok": False,
+            "message": "No MediTrust account was found for this email."
         }
 
     code = otp_store.generate_code(email)
@@ -36,7 +35,7 @@ def request_reset(data: ForgotPasswordIn, db: Session = Depends(get_db)):
 
     return {
         "ok": True,
-        "message": "If this email exists, a reset code has been sent."
+        "message": "A 6-digit reset code has been sent to your email."
     }
 
 

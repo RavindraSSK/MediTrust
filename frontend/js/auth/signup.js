@@ -4,8 +4,7 @@ import {
   getPasswordValidationMessage,
 } from "./password-rules.js?v=20260418f";
 import { attachPasswordToggle } from "./password-toggle.js?v=20260418f";
-
-const API_BASE = "http://127.0.0.1:8000";
+import { registerUser } from "../services/api.js?v=20260418f";
 
 export function initSignupPage() {
   const signupForm = document.getElementById("signupForm");
@@ -52,22 +51,14 @@ export function initSignupPage() {
     }
 
     try {
-      const response = await fetch(`${API_BASE}/auth/register`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({
-          first_name: firstName,
-          last_name: lastName,
-          email,
-          password,
-          role,
-          hospital_name: hospitalName
-        })
-      });
-
-      const data = await response.json();
+      const data = await registerUser(
+        firstName,
+        lastName,
+        email,
+        password,
+        role,
+        hospitalName
+      );
 
       if (!data.ok) {
         signupMessage.textContent = data.message || "Registration failed.";

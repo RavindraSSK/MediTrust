@@ -1,4 +1,4 @@
-import { API_BASE } from "../config.js";
+export const API_BASE = "http://127.0.0.1:8001";
 
 export async function registerUser(firstName, lastName, email, password, role = "Doctor", hospitalName = "") {
   const res = await fetch(`${API_BASE}/auth/register`, {

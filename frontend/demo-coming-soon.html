@@ -3,97 +3,127 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Workflow Coming Soon | MediTrust</title>
+  <title>MediTrust | Demo Preview</title>
   <link rel="stylesheet" href="css/style.css" />
-  <style>
-    body {
-      margin: 0;
-      min-height: 100vh;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-    }
-
-    .coming-soon-shell {
-      position: relative;
-      z-index: 2;
-      width: min(92%, 520px);
-    }
-
-    .coming-soon-card {
-      background: rgba(10, 19, 35, 0.78);
-      border: 1px solid rgba(255, 255, 255, 0.08);
-      box-shadow: 0 18px 60px rgba(0, 0, 0, 0.32);
-      backdrop-filter: blur(14px);
-      border-radius: 24px;
-      padding: 36px 30px;
-      text-align: center;
-      color: #eaf2ff;
-    }
-
-    .coming-soon-card h1 {
-      margin: 0 0 12px;
-      font-size: 30px;
-      font-weight: 700;
-    }
-
-    .coming-soon-card p {
-      margin: 0 0 24px;
-      color: rgba(234, 242, 255, 0.82);
-      line-height: 1.6;
-      font-size: 15px;
-    }
-
-    .coming-soon-actions {
-      display: flex;
-      justify-content: center;
-      gap: 12px;
-      flex-wrap: wrap;
-    }
-
-    .coming-soon-btn {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      min-width: 150px;
-      padding: 12px 18px;
-      border-radius: 12px;
-      text-decoration: none;
-      font-weight: 600;
-      transition: 0.2s ease;
-    }
-
-    .coming-soon-btn.primary {
-      background: linear-gradient(135deg, #3b82f6, #2563eb);
-      color: white;
-    }
-
-    .coming-soon-btn.secondary {
-      background: rgba(255, 255, 255, 0.08);
-      color: #eaf2ff;
-      border: 1px solid rgba(255, 255, 255, 0.12);
-    }
-
-    .coming-soon-btn:hover {
-      transform: translateY(-1px);
-    }
-  </style>
+  <link rel="stylesheet" href="css/meditrust.css" />
 </head>
 <body class="dashboard-page">
   <div class="page-bg"></div>
   <div class="page-overlay"></div>
 
-  <main class="coming-soon-shell">
-    <section class="coming-soon-card">
-      <h1>Workflow Coming Soon</h1>
-      <p>
-        This clinical workflow module is currently under development.
-        It will support role-based review actions, triage handling, and guided escalation inside MediTrust.
-      </p>
+  <main class="dashboard-shell">
+    <section class="dashboard-card">
+      <div class="topbar">
+        <div>
+          <h1>MediTrust</h1>
+          <div class="subtitle">
+            Explore a realistic clinician-facing preview of the MediTrust cardiovascular risk result screen using static sample data.
+          </div>
 
-      <div class="coming-soon-actions">
-        <a href="index.html" class="coming-soon-btn secondary">Back to Login</a>
-        <a href="meditrust.html" class="coming-soon-btn primary">Open Assessment</a>
+          <div class="actions">
+            <a href="index.html" class="btn-secondary result-link-btn">Back to Login</a>
+            <a href="meditrust.html" class="mini-btn">Open Assessment</a>
+          </div>
+        </div>
+
+        <div class="pill">Demo Preview</div>
+      </div>
+
+      <div class="quick-overview">
+        <div class="overview-card">
+          <small>Sample Scenario</small>
+          <strong>Demo patient snapshot: age 67, total cholesterol 286 mg/dL, resting blood pressure 156 mmHg, and exercise-related symptoms indicating elevated cardiovascular concern.</strong>
+        </div>
+      </div>
+
+      <section class="section-box">
+        <div class="section-header">
+          <div>
+            <div class="section-title">Assessment Result</div>
+            <div class="section-subtitle">Static product preview of a completed MediTrust risk assessment.</div>
+          </div>
+          <span class="demo-chip">Demo Preview &ndash; Sample Output</span>
+        </div>
+
+        <div class="result show visible" aria-live="polite">
+          <div class="risk-fluid">
+            <div class="result-title">Assessment Result</div>
+
+            <div class="risk-score-big">78%</div>
+
+            <div class="risk-inline">
+              <div class="risk-level-text">High Risk</div>
+              <div class="risk-status-badge high">Needs attention</div>
+            </div>
+
+            <div class="risk-meter">
+              <div class="meter-labels">
+                <span>Lower</span>
+                <span>Higher</span>
+              </div>
+
+              <div class="meter-track">
+                <div class="meter-fill high" style="width: 78%;"></div>
+              </div>
+            </div>
+
+            <div class="risk-note">
+              Sample clinical summary: Elevated cholesterol, high resting blood pressure, and older age combine to suggest a clinically significant cardiovascular risk profile in this demo case.
+            </div>
+
+            <div class="workflow-notice">
+              <div class="workflow-banner workflow-high">
+                <strong>Recommended Action:</strong>
+                Immediate physician evaluation recommended.
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="section-box">
+        <div class="section-header">
+          <div>
+            <div class="section-title">Top 3 Contributing Factors</div>
+            <div class="section-subtitle">Key drivers of the sample high-risk result shown above.</div>
+          </div>
+        </div>
+
+        <div class="professional-clinical-box">
+          <p class="clinical-summary-text">
+            This static preview reflects a patient pattern with several reinforcing cardiovascular risk markers. The combined effect of lipid burden, uncontrolled blood pressure, and age pushes the sample assessment into a high-risk range.
+          </p>
+
+          <ul class="clinical-factor-list">
+            <li class="risk-up">
+              <strong>Cholesterol</strong>
+              <div class="clinical-factor-text">
+                Total cholesterol is elevated, suggesting a greater likelihood of atherosclerotic burden and increased cardiovascular event risk.
+              </div>
+            </li>
+            <li class="risk-up">
+              <strong>Blood Pressure</strong>
+              <div class="clinical-factor-text">
+                A resting blood pressure of 156 mmHg indicates hypertension that meaningfully increases the overall risk estimate.
+              </div>
+            </li>
+            <li class="risk-up">
+              <strong>Age</strong>
+              <div class="clinical-factor-text">
+                Older age raises baseline cardiovascular vulnerability and amplifies the significance of the other abnormal findings.
+              </div>
+            </li>
+          </ul>
+
+          <p class="clinical-conclusion">
+            Clinical Summary: This preview demonstrates how MediTrust can present a clinician-friendly interpretation of model output while keeping the final care decision with the physician.
+          </p>
+        </div>
+      </section>
+
+      <div class="footer">
+        <div>&copy; 2026 MediTrust</div>
+        <div>Static demo assessment preview</div>
       </div>
     </section>
   </main>

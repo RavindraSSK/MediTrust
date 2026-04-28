@@ -1,6 +1,6 @@
 import { storeCurrentUser } from "./session.js?v=20260418f";
 import { attachPasswordToggle } from "./password-toggle.js?v=20260418f";
-import { API_BASE } from "../config.js";
+import { loginUser } from "../services/api.js?v=20260418f";
 
 export function initLoginPage() {
   const loginForm = document.getElementById("loginForm");
@@ -37,15 +37,7 @@ export function initLoginPage() {
     loginBtn.textContent = "Signing In...";
 
     try {
-      const response = await fetch(`${API_BASE}/auth/login`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({ email, password })
-      });
-
-      const data = await response.json();
+      const data = await loginUser(email, password);
 
       if (!data.ok) {
         if (loginMessage) {
