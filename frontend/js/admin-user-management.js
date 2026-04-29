@@ -12,6 +12,7 @@ import {
 } from "./dashboard.js";
 
 const roles = ["Doctor", "Nurse", "Admin"];
+const UNIVERSAL_ADMIN_EMAIL = "meditrust@gmail.com";
 let currentUser = null;
 let users = [];
 let assignments = [];
@@ -54,6 +55,10 @@ function isSelf(row) {
   return row.email === currentUser.email || row.id === currentUser.id;
 }
 
+function isUniversalAdmin(row) {
+  return (row.email || "").toLowerCase().trim() === UNIVERSAL_ADMIN_EMAIL;
+}
+
 function sortUsersNewestFirst(rows) {
   return [...rows].sort((a, b) => (Number(b.id) || 0) - (Number(a.id) || 0));
 }
@@ -80,7 +85,7 @@ function matchesAssignment(row, query) {
 
 function renderRoleSelect(row) {
   return `
-    <select class="admin-select role-change-select" data-user-id="${row.id}" ${isSelf(row) ? "disabled" : ""}>
+    <select class="admin-select role-change-select" data-user-id="${row.id}" ${isSelf(row) || isUniversalAdmin(row) ? "disabled" : ""}>
       ${roles.map(role => `
         <option value="${role}" ${row.role === role ? "selected" : ""}>${role}</option>
       `).join("")}
@@ -132,7 +137,7 @@ function renderRegisteredRows(rows, emptyText) {
       <td>
         <div class="admin-action-row">
           ${renderRoleSelect(row)}
-          <button class="mini-btn admin-row-btn delete-user-btn" data-user-id="${row.id}" ${isSelf(row) ? "disabled" : ""}>Delete</button>
+          <button class="mini-btn admin-row-btn delete-user-btn" data-user-id="${row.id}" ${isSelf(row) || isUniversalAdmin(row) ? "disabled" : ""}>Delete</button>
         </div>
       </td>
     </tr>

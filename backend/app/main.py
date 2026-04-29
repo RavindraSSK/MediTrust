@@ -7,7 +7,7 @@ from dotenv import load_dotenv
 import os
 
 load_dotenv()
-from .db import Base, engine, get_db
+from .db import Base, engine, get_db, SessionLocal
 from . import models
 from .models import User
 from .schemas import (
@@ -30,6 +30,11 @@ from .auth import router as auth_extra_router
 app = FastAPI(title="MediTrust API", version="0.1")
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+
+UNIVERSAL_ADMIN_EMAIL = "meditrust@gmail.com"
+UNIVERSAL_ADMIN_PASSWORD = "Meditrust@12"
+UNIVERSAL_ADMIN_ROLE = "Admin"
+UNIVERSAL_ADMIN_STATUS = "approved"
 
 ALLOWED_ORIGINS = [
     "http://127.0.0.1:5500",
@@ -206,6 +211,44 @@ def serialize_user(user: User):
     }
 
 
+def is_universal_admin(user: User) -> bool:
+    return (user.email or "").lower().strip() == UNIVERSAL_ADMIN_EMAIL
+
+
+def ensure_universal_admin(db: Session):
+    admin = db.query(User).filter(User.email == UNIVERSAL_ADMIN_EMAIL).first()
+    password_hash = pwd_context.hash(UNIVERSAL_ADMIN_PASSWORD)
+
+    if not admin:
+        admin = User(
+            full_name="MediTrust Admin",
+            first_name="MediTrust",
+            last_name="Admin",
+            email=UNIVERSAL_ADMIN_EMAIL,
+            password_hash=password_hash,
+            role=UNIVERSAL_ADMIN_ROLE,
+            role_status=UNIVERSAL_ADMIN_STATUS,
+            hospital_name="MediTrust",
+        )
+        db.add(admin)
+        db.commit()
+        return
+
+    changed = False
+    if admin.role != UNIVERSAL_ADMIN_ROLE:
+        admin.role = UNIVERSAL_ADMIN_ROLE
+        changed = True
+    if (getattr(admin, "role_status", None) or "").lower() != UNIVERSAL_ADMIN_STATUS:
+        admin.role_status = UNIVERSAL_ADMIN_STATUS
+        changed = True
+    if not pwd_context.verify(UNIVERSAL_ADMIN_PASSWORD, admin.password_hash):
+        admin.password_hash = password_hash
+        changed = True
+
+    if changed:
+        db.commit()
+
+
 def get_admin_user(
     x_admin_email: str = Header(default=""),
     db: Session = Depends(get_db),
@@ -249,6 +292,11 @@ def serialize_assignment(assignment, doctor: User, nurse: User):
 def on_startup():
     Base.metadata.create_all(bind=engine)
     migrate_name_columns()
+    db = SessionLocal()
+    try:
+        ensure_universal_admin(db)
+    finally:
+        db.close()
 
 
 @app.get("/")
@@ -523,6 +571,9 @@ def admin_update_user_role(
     admin: User = Depends(get_admin_user),
 ):
     user = get_user_or_404(user_id, db)
+    if is_universal_admin(user) and normalize_role(data.role) != UNIVERSAL_ADMIN_ROLE:
+        raise HTTPException(status_code=400, detail="The permanent system admin must remain Admin.")
+
     if user.id == admin.id:
         raise HTTPException(status_code=400, detail="Admins cannot change their own role from this screen.")
 
@@ -544,10 +595,13 @@ def admin_update_user_role_status(
     admin: User = Depends(get_admin_user),
 ):
     user = get_user_or_404(user_id, db)
+    role_status = (data.role_status or "").strip().lower()
+    if is_universal_admin(user) and role_status != UNIVERSAL_ADMIN_STATUS:
+        raise HTTPException(status_code=400, detail="The permanent system admin must remain approved.")
+
     if user.id == admin.id:
         raise HTTPException(status_code=400, detail="Admins cannot change their own approval status from this screen.")
 
-    role_status = (data.role_status or "").strip().lower()
     if role_status not in VALID_ROLE_STATUSES:
         raise HTTPException(status_code=400, detail="Unsupported approval status.")
 
@@ -564,6 +618,9 @@ def admin_delete_user(
     admin: User = Depends(get_admin_user),
 ):
     user = get_user_or_404(user_id, db)
+    if is_universal_admin(user):
+        raise HTTPException(status_code=400, detail="The permanent system admin cannot be deleted.")
+
     if user.id == admin.id:
         raise HTTPException(status_code=400, detail="Admins cannot delete their own account.")
 
