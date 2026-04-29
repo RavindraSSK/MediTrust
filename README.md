@@ -18,11 +18,12 @@
 - Add feature importance visualization
 - Improve UI/UX (modern healthcare dashboard)
 - Enhance authentication 
-## Sprint 4 – Finalization & Clinical Workflow (in progress)
+## Sprint 4 – Finalization & Clinical Workflow
 - Enhanced prediction output with clear clinical interpretation
 - Integrated Gemini for AI-based summaries
 - Completed nurse and doctor dashboard workflows
 - Implemented case status flow and performed final testing
+- Deployed (AWS-EC2)
 
 
 Team:
