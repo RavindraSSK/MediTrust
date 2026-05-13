@@ -6,6 +6,9 @@
     "**/*.pyc",
     "**/backend/**",
     "**/ml/**",
+    "**/*.log",
+    "**/tmp_*",
+    "**/.codex_tmp*",
     "**/runlocal_*.log",
     "**/uvicorn_*.log"
   ]

@@ -43,9 +43,10 @@
           <h2>Quick Actions</h2>
           <div class="action-list">
             <a href="meditrust.html" class="action-btn">Start New Patient Assessment</a>
-            <button class="action-btn action-btn-secondary" type="button">Review Triage Queue</button>
-            <button class="action-btn action-btn-secondary" type="button">Escalate High Risk Case</button>
+            <button id="reviewTriageBtn" class="action-btn action-btn-secondary" type="button">Review Triage Queue</button>
+            <button id="escalateSelectedBtn" class="action-btn action-btn-secondary" type="button">Escalate High Risk Case</button>
           </div>
+          <div id="nurseWorkflowMessage" class="workflow-message" role="status"></div>
         </div>
 
         <div class="panel-box">
@@ -56,6 +57,40 @@
         </div>
       </section>
 
+      <section id="triageQueuePanel" class="panel-box wide-panel triage-panel" hidden>
+        <div class="clinical-panel-header">
+          <div>
+            <h2>Triage Queue</h2>
+            <p>Review live prediction cases and escalate clinically significant risk.</p>
+          </div>
+          <div class="filter-row" id="triageFilterRow">
+            <button class="filter-chip is-active" type="button" data-filter="All">All</button>
+            <button class="filter-chip" type="button" data-filter="Urgent">Urgent</button>
+            <button class="filter-chip" type="button" data-filter="Monitor">Monitor</button>
+            <button class="filter-chip" type="button" data-filter="Escalated">Escalated</button>
+            <button class="filter-chip" type="button" data-filter="Pending">Pending</button>
+          </div>
+        </div>
+
+        <div class="clinical-table-wrap">
+          <table class="clinical-table">
+            <thead>
+              <tr>
+                <th>Patient</th>
+                <th>Age</th>
+                <th>Risk</th>
+                <th>Probability</th>
+                <th>Priority</th>
+                <th>Status</th>
+                <th>Date / Time</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="triageQueueBody"></tbody>
+          </table>
+        </div>
+        <div id="triageQueueEmpty" class="empty-clinical-note" hidden>No triage cases match this filter.</div>
+      </section>
     </section>
   </main>
 
@@ -65,8 +100,13 @@
       attachLogout,
       fetchRecentPredictions,
       fetchDashboardSummary,
+      fetchTriageQueue,
+      renderTriageQueue,
+      escalateCase,
       formatRiskPercent,
-      formatDateTime
+      formatDateTime,
+      safeText,
+      formatNumber
     } from "./js/dashboard.js";
 
     const user = getCurrentUser("Nurse");
@@ -76,6 +116,95 @@
       [user.first_name, user.last_name].filter(Boolean).join(" ").trim() || user.full_name || "Nurse";
 
     attachLogout();
+
+    let triageQueue = [];
+    let selectedCaseId = null;
+    let activeFilter = "All";
+
+    function showMessage(message, type = "info") {
+      const node = document.getElementById("nurseWorkflowMessage");
+      node.textContent = message;
+      node.className = `workflow-message workflow-${type}`;
+    }
+
+    function getFilteredQueue() {
+      if (activeFilter === "All") return triageQueue;
+      return triageQueue.filter((item) => item.priority === activeFilter || item.status === activeFilter);
+    }
+
+    function renderQueue() {
+      renderTriageQueue(getFilteredQueue(), { selectedCaseId });
+      document.querySelectorAll("#triageQueueBody tr").forEach((row) => {
+        row.addEventListener("click", () => {
+          selectedCaseId = Number(row.dataset.caseId);
+          renderQueue();
+        });
+      });
+
+      document.querySelectorAll("#triageQueueBody button").forEach((button) => {
+        button.addEventListener("click", async (event) => {
+          event.stopPropagation();
+          selectedCaseId = Number(button.dataset.caseId);
+          if (button.dataset.action === "view") {
+            renderQueue();
+            showMessage(`Case #${selectedCaseId} selected for review.`, "info");
+            return;
+          }
+          await handleEscalation(selectedCaseId);
+        });
+      });
+    }
+
+    async function fetchAndRenderTriageQueue() {
+      const panel = document.getElementById("triageQueuePanel");
+      panel.hidden = false;
+      showMessage("Loading triage queue...", "info");
+      try {
+        triageQueue = await fetchTriageQueue();
+        renderQueue();
+        showMessage("Triage queue ready for review.", "success");
+      } catch (error) {
+        triageQueue = [];
+        renderQueue();
+        showMessage(error.message || "Unable to load triage queue.", "error");
+      }
+    }
+
+    async function handleEscalation(caseId = selectedCaseId) {
+      if (!caseId) {
+        showMessage("Select a case before escalating.", "warning");
+        return;
+      }
+
+      const item = triageQueue.find((row) => Number(row.id) === Number(caseId));
+      if (!item) {
+        showMessage("Selected case is no longer visible in this queue.", "warning");
+        return;
+      }
+
+      if (item.escalated || item.status === "Escalated") {
+        showMessage("This case is already escalated.", "warning");
+        return;
+      }
+
+      if (!["High", "Medium"].includes(item.risk_level)) {
+        showMessage("Only high-risk or selected medium-risk cases can be escalated.", "warning");
+        return;
+      }
+
+      showMessage("Escalating case to doctor...", "info");
+      try {
+        const result = await escalateCase(caseId);
+        if (!result.ok) {
+          showMessage(result.message || "This case is already escalated.", "warning");
+        } else {
+          showMessage("Case escalated to doctor for review.", "success");
+        }
+        await fetchAndRenderTriageQueue();
+      } catch (error) {
+        showMessage(error.message || "Unable to escalate case.", "error");
+      }
+    }
 
     async function loadNurseDashboard() {
       try {
@@ -94,13 +223,13 @@
 
         list.innerHTML = recent.map(item => `
           <li>
-            <strong>Prediction #${item.id} • ${item.risk_level}</strong>
+            <strong>${safeText(item.full_name || `Prediction #${item.id}`)} - ${safeText(item.risk_level)}</strong>
             <span>
-              Risk: ${formatRiskPercent(item.risk_probability)} •
-              Age: ${item.age} •
-              BP: ${item.trestbps} •
-              Chol: ${item.chol} •
-              ${formatDateTime(item.created_at)}
+              Risk: ${formatRiskPercent(item.risk_probability)} -
+              Age: ${safeText(formatNumber(item.age))} -
+              BP: ${safeText(formatNumber(item.trestbps))} -
+              Chol: ${safeText(formatNumber(item.chol))} -
+              ${safeText(formatDateTime(item.created_at))}
             </span>
           </li>
         `).join("");
@@ -109,6 +238,18 @@
           `<li><span>Unable to load triage queue.</span></li>`;
       }
     }
+
+    document.getElementById("reviewTriageBtn").addEventListener("click", fetchAndRenderTriageQueue);
+    document.getElementById("escalateSelectedBtn").addEventListener("click", () => handleEscalation());
+    document.getElementById("triageFilterRow").addEventListener("click", (event) => {
+      const button = event.target.closest("button[data-filter]");
+      if (!button) return;
+      activeFilter = button.dataset.filter;
+      document.querySelectorAll(".filter-chip").forEach((chip) => {
+        chip.classList.toggle("is-active", chip === button);
+      });
+      renderQueue();
+    });
 
     loadNurseDashboard();
   </script>

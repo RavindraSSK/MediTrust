@@ -23,6 +23,7 @@ from .schemas import (
     PredictResponse,
 )
 from .ml_service import predict_probability, explain_prediction, generate_gemini_summary
+from .password_utils import validate_password_for_bcrypt
 from .risk import risk_level_from_probability
 from .auth import router as auth_extra_router
 
@@ -39,6 +40,13 @@ ALLOWED_ORIGINS = [
     "http://127.0.0.1:5173",
     "http://localhost:5173",
 ]
+
+azure_allowed_origins = [
+    origin.strip()
+    for origin in os.getenv("ALLOWED_ORIGINS", "").split(",")
+    if origin.strip()
+]
+ALLOWED_ORIGINS = list(dict.fromkeys(ALLOWED_ORIGINS + azure_allowed_origins))
 
 app.add_middleware(
     CORSMiddleware,
@@ -182,6 +190,118 @@ def serialize_prediction_log(row):
     }
 
 
+FEATURE_MEANINGS = {
+    "age": "Age helps estimate baseline cardiovascular risk.",
+    "sex": "Sex is used as one demographic risk signal in the heart disease model.",
+    "cp": "Chest pain type describes the pattern of chest discomfort reported during assessment.",
+    "trestbps": "Resting blood pressure reflects pressure on the cardiovascular system at rest.",
+    "chol": "Total cholesterol can indicate lipid-related cardiovascular burden.",
+    "fbs": "Fasting blood sugar helps identify glucose-related risk patterns.",
+    "restecg": "Resting ECG findings show electrical patterns seen before exertion.",
+    "thalach": "Maximum heart rate achieved reflects exercise response and cardiac reserve.",
+    "exang": "Exercise-induced angina indicates chest discomfort triggered by exertion.",
+    "oldpeak": "Exercise-induced ST depression can reflect stress-related ECG changes.",
+    "slope": "ST-segment slope describes how the ECG changes during exercise.",
+    "ca": "Major vessel involvement reflects the number of visible affected vessels.",
+    "thal": "Thallium stress test result reflects blood-flow patterns during cardiac stress testing.",
+}
+
+FEATURE_LABELS = {
+    "age": "Age",
+    "sex": "Sex",
+    "cp": "Chest pain type",
+    "trestbps": "Resting blood pressure",
+    "chol": "Total cholesterol",
+    "fbs": "Fasting blood sugar",
+    "restecg": "Resting ECG result",
+    "thalach": "Maximum heart rate",
+    "exang": "Exercise-induced angina",
+    "oldpeak": "ST depression during exercise",
+    "slope": "ST-segment slope",
+    "ca": "Major vessel involvement",
+    "thal": "Thallium stress test result",
+}
+
+
+def normalize_risk_level(value: str | None) -> str:
+    cleaned = (value or "").strip().lower()
+    if cleaned == "high":
+        return "High"
+    if cleaned == "medium":
+        return "Medium"
+    if cleaned == "low":
+        return "Low"
+    return "Unknown"
+
+
+def priority_for_risk(risk_level: str | None) -> str:
+    level = normalize_risk_level(risk_level)
+    if level == "High":
+        return "Urgent"
+    if level == "Medium":
+        return "Monitor"
+    return "Routine"
+
+
+def patient_display_name(row) -> str:
+    name = compose_full_name(row.first_name or "", row.last_name or "")
+    return name or row.full_name or f"Patient #{row.id}"
+
+
+def get_case_or_404(case_id: int, db: Session):
+    case = db.query(models.PredictionLog).filter(models.PredictionLog.id == case_id).first()
+    if not case:
+        raise HTTPException(status_code=404, detail="Case not found.")
+    return case
+
+
+def serialize_triage_case(row, escalation=None):
+    escalated = escalation is not None
+    return {
+        **serialize_prediction_log(row),
+        "patient_id": row.id,
+        "patient_name": patient_display_name(row),
+        "status": "Escalated" if escalated else "Pending",
+        "priority": priority_for_risk(row.risk_level),
+        "escalated": escalated,
+        "escalation_id": escalation.id if escalation else None,
+        "escalated_at": escalation.created_at if escalation else None,
+        "nurse_id": escalation.nurse_id if escalation else None,
+    }
+
+
+def feature_to_clinical_text(item):
+    feature = str(item.get("feature") or "").strip()
+    direction = str(item.get("direction") or "").strip().lower()
+    label = FEATURE_LABELS.get(feature, feature.replace("_", " ").title() if feature else "Clinical feature")
+    meaning = FEATURE_MEANINGS.get(feature, "This feature contributed to the model's risk estimate.")
+    if direction == "increases risk":
+        effect = "This finding pushed the estimated risk higher."
+    elif direction == "decreases risk":
+        effect = "This finding helped lower the estimated risk."
+    else:
+        effect = "This finding influenced the estimated risk."
+    return {
+        "feature": feature,
+        "label": label,
+        "value": item.get("value"),
+        "direction": item.get("direction") or "influences risk",
+        "explanation": f"{meaning} {effect}",
+    }
+
+
+def build_fallback_explanation(top_features: list[dict], risk_level: str) -> str:
+    increasing = [feature_to_clinical_text(item)["label"] for item in top_features if item.get("direction") == "increases risk"]
+    reducing = [feature_to_clinical_text(item)["label"] for item in top_features if item.get("direction") == "decreases risk"]
+    drivers = ", ".join(increasing[:3]) if increasing else "the available clinical features"
+    offsets = ", ".join(reducing[:2]) if reducing else "no strong risk-reducing factor"
+    return (
+        f"{drivers} contributed most to this {risk_level.lower()} risk prediction. "
+        f"{offsets} offset the prediction to some extent. The AI model suggests this risk pattern, "
+        "but the final decision must be made by the clinician."
+    )
+
+
 def normalize_role(role: str) -> str:
     cleaned = (role or "").strip().lower()
     role_map = {
@@ -283,13 +403,17 @@ def register(data: RegisterIn, db: Session = Depends(get_db)):
     if requested_role not in VALID_ROLES:
         return {"ok": False, "message": "Unsupported role selected."}
 
+    password, password_error = validate_password_for_bcrypt(data.password)
+    if password_error:
+        return {"ok": False, "message": password_error}
+
     is_first_user = db.query(User).count() == 0
     user = User(
         full_name=compose_full_name(data.first_name, data.last_name),
         first_name=data.first_name.strip(),
         last_name=data.last_name.strip(),
         email=email,
-        password_hash=pwd_context.hash(data.password),
+        password_hash=pwd_context.hash(password),
         role=requested_role,
         role_status="approved" if is_first_user else "pending",
         hospital_name=data.hospital_name,
@@ -438,6 +562,150 @@ def urgent_predictions(db: Session = Depends(get_db)):
         serialize_prediction_log(r)
         for r in rows
     ]
+
+
+@app.get("/cases/triage-queue", tags=["Cases"])
+def triage_queue(db: Session = Depends(get_db)):
+    rows = (
+        db.query(models.PredictionLog)
+        .order_by(models.PredictionLog.created_at.desc(), models.PredictionLog.id.desc())
+        .limit(100)
+        .all()
+    )
+    escalations = {
+        item.case_id: item
+        for item in db.query(models.CaseEscalation).all()
+    }
+    return [serialize_triage_case(row, escalations.get(row.id)) for row in rows]
+
+
+@app.post("/cases/{case_id}/escalate", tags=["Cases"])
+def escalate_case(
+    case_id: int,
+    x_nurse_id: str = Header(default=""),
+    db: Session = Depends(get_db),
+):
+    case = get_case_or_404(case_id, db)
+    risk_level = normalize_risk_level(case.risk_level)
+
+    if risk_level not in {"High", "Medium"}:
+        raise HTTPException(
+            status_code=400,
+            detail="Only high-risk or selected medium-risk cases can be escalated.",
+        )
+
+    existing = (
+        db.query(models.CaseEscalation)
+        .filter(models.CaseEscalation.case_id == case.id)
+        .first()
+    )
+    if existing:
+        return {
+            "ok": False,
+            "message": "This case is already escalated.",
+            "case": serialize_triage_case(case, existing),
+        }
+
+    nurse_id = None
+    try:
+        nurse_id = int(x_nurse_id) if str(x_nurse_id).strip() else None
+    except ValueError:
+        nurse_id = None
+
+    escalation = models.CaseEscalation(case_id=case.id, nurse_id=nurse_id)
+    db.add(escalation)
+    db.commit()
+    db.refresh(escalation)
+
+    return {
+        "ok": True,
+        "message": "Case escalated to doctor for review.",
+        "case": serialize_triage_case(case, escalation),
+    }
+
+
+@app.get("/doctor/escalations", tags=["Doctor"])
+def doctor_escalations(db: Session = Depends(get_db)):
+    rows = (
+        db.query(models.CaseEscalation, models.PredictionLog)
+        .join(models.PredictionLog, models.CaseEscalation.case_id == models.PredictionLog.id)
+        .order_by(models.CaseEscalation.created_at.desc(), models.CaseEscalation.id.desc())
+        .all()
+    )
+    return [serialize_triage_case(case, escalation) for escalation, case in rows]
+
+
+@app.get("/cases/{case_id}/explainability", tags=["Cases"])
+def case_explainability(case_id: int, db: Session = Depends(get_db)):
+    case = get_case_or_404(case_id, db)
+    payload = {
+        "age": case.age,
+        "sex": case.sex,
+        "cp": case.cp,
+        "trestbps": case.trestbps,
+        "chol": case.chol,
+        "fbs": case.fbs,
+        "restecg": case.restecg,
+        "thalach": case.thalach,
+        "exang": case.exang,
+        "oldpeak": case.oldpeak,
+        "slope": case.slope,
+        "ca": case.ca,
+        "thal": case.thal,
+    }
+    missing = [key for key, value in payload.items() if value is None]
+    if missing:
+        raise HTTPException(status_code=400, detail="This case is missing model inputs needed for explainability.")
+
+    risk_level = normalize_risk_level(case.risk_level)
+    triage_recommendation = risk_level_from_probability(float(case.risk_probability or 0))[1]
+    top_features, all_features, base_value, explanation_summary = explain_prediction(payload, risk_level)
+    gemini_summary = generate_gemini_summary(
+        top_features=top_features,
+        risk_level=risk_level,
+        risk_probability=case.risk_probability,
+        triage_recommendation=triage_recommendation,
+        explanation_summary=explanation_summary,
+    )
+    increasing = [
+        feature_to_clinical_text(item)
+        for item in top_features
+        if item.get("direction") == "increases risk"
+    ]
+    reducing = [
+        feature_to_clinical_text(item)
+        for item in top_features
+        if item.get("direction") == "decreases risk"
+    ]
+    clinical_summary = gemini_summary or build_fallback_explanation(top_features, risk_level)
+
+    return {
+        "case": serialize_prediction_log(case),
+        "patient": {
+            "id": case.id,
+            "name": patient_display_name(case),
+            "age": case.age,
+        },
+        "risk_probability": case.risk_probability,
+        "risk_level": risk_level,
+        "triage_recommendation": triage_recommendation,
+        "risk_increasing_factors": increasing,
+        "risk_reducing_factors": reducing,
+        "clinical_interpretation": clinical_summary,
+        "suggested_next_action": (
+            "Arrange immediate physician review and correlate with symptoms, ECG, vitals, and troponin pathway."
+            if risk_level == "High"
+            else "Continue priority monitoring and escalate if symptoms, ECG, or vitals worsen."
+            if risk_level == "Medium"
+            else "Continue routine clinical review and patient education based on clinician judgment."
+        ),
+        "confidence_note": "AI model suggests this risk level, but final decision must be made by clinician.",
+        "gemini_summary": gemini_summary,
+        "fallback_summary": None if gemini_summary else clinical_summary,
+        "top_features": [feature_to_clinical_text(item) for item in top_features],
+        "all_features": all_features,
+        "base_value": base_value,
+    }
 
 
 @app.get("/patients/recent", tags=["Patients"])
