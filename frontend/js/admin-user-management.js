@@ -9,7 +9,7 @@ import {
   createDoctorNurseAssignment,
   deleteDoctorNurseAssignment,
   formatDateTime
-} from "./dashboard.js";
+} from "./dashboard.js?v=20260429c";
 
 const roles = ["Doctor", "Nurse", "Admin"];
 const UNIVERSAL_ADMIN_EMAIL = "meditrust@gmail.com";
@@ -258,13 +258,13 @@ export function initUserManagementHub() {
   try {
     setupAdminPage();
     document.getElementById("pendingRequestsBtn").addEventListener("click", () => {
-      window.location.href = "pending-requests/";
+      window.location.href = "pending-requests/index.html";
     });
     document.getElementById("registeredUsersBtn").addEventListener("click", () => {
-      window.location.href = "registered-users/";
+      window.location.href = "registered-users/index.html";
     });
     document.getElementById("doctorNurseAssignmentsBtn").addEventListener("click", () => {
-      window.location.href = "doctor-nurse-assignments/";
+      window.location.href = "doctor-nurse-assignments/index.html";
     });
   } catch (error) {
     const node = document.getElementById("adminUserName");

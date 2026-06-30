@@ -1,7 +1,7 @@
 import {
   requestPasswordReset,
   verifyResetCode,
-} from "../services/api.js?v=20260418f";
+} from "../services/api.js?v=20260429c";
 
 const RESET_FLOW_KEY = "meditrust_reset_flow";
 const form = document.getElementById("forgotPasswordForm");

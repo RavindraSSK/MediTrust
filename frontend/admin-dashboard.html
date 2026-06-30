@@ -43,9 +43,10 @@
           <h2>Admin Actions</h2>
           <div class="action-list">
             <button class="action-btn" id="manageUsersBtn" type="button">Manage Users</button>
-            <button class="action-btn action-btn-secondary" type="button">View Prediction Logs</button>
-            <button class="action-btn action-btn-secondary" type="button">Monitor Activity</button>
+            <button class="action-btn action-btn-secondary" id="viewPredictionLogsBtn" type="button">View Prediction Logs</button>
+            <button class="action-btn action-btn-secondary" id="monitorActivityBtn" type="button">Monitor Activity</button>
           </div>
+          <div id="adminWorkflowMessage" class="workflow-message" role="status"></div>
         </div>
 
         <div class="panel-box">
@@ -54,6 +55,43 @@
             <li><span>Loading recent predictions...</span></li>
           </ul>
         </div>
+      </section>
+
+      <section id="adminCasePanel" class="panel-box wide-panel admin-live-panel" hidden>
+        <div class="clinical-panel-header">
+          <div>
+            <h2>Prediction Logs</h2>
+            <p>Recent model runs, triage priority, escalation status, and doctor review outcomes.</p>
+          </div>
+        </div>
+        <div class="clinical-table-wrap">
+          <table class="clinical-table">
+            <thead>
+              <tr>
+                <th>Case</th>
+                <th>Risk</th>
+                <th>Probability</th>
+                <th>Status</th>
+                <th>Decision</th>
+                <th>Created</th>
+              </tr>
+            </thead>
+            <tbody id="adminCaseTableBody"></tbody>
+          </table>
+        </div>
+        <div id="adminCaseEmpty" class="empty-clinical-note" hidden>No prediction logs are available yet.</div>
+      </section>
+
+      <section id="adminActivityPanel" class="panel-box wide-panel admin-live-panel" hidden>
+        <div class="clinical-panel-header">
+          <div>
+            <h2>Activity Monitor</h2>
+            <p>Audit-style view for demo oversight across users, predictions, escalations, and reviews.</p>
+          </div>
+        </div>
+        <ul class="alert-list" id="adminActivityList">
+          <li><span>Activity monitor has not been loaded.</span></li>
+        </ul>
       </section>
     </section>
   </main>
@@ -64,8 +102,11 @@
       attachLogout,
       fetchRecentPredictions,
       fetchDashboardSummary,
+      fetchAdminCases,
+      fetchAdminAuditLog,
       formatRiskPercent,
-      formatDateTime
+      formatDateTime,
+      safeText
     } from "./js/dashboard.js";
 
     const user = getCurrentUser("Admin");
@@ -77,6 +118,81 @@
     attachLogout();
 
     const manageUsersBtn = document.getElementById("manageUsersBtn");
+    const viewPredictionLogsBtn = document.getElementById("viewPredictionLogsBtn");
+    const monitorActivityBtn = document.getElementById("monitorActivityBtn");
+
+    function showAdminMessage(message, type = "info") {
+      const node = document.getElementById("adminWorkflowMessage");
+      node.textContent = message;
+      node.className = `workflow-message workflow-${type}`;
+    }
+
+    function showPanel(panelId) {
+      document.querySelectorAll(".admin-live-panel").forEach((panel) => {
+        panel.hidden = panel.id !== panelId;
+      });
+    }
+
+    function renderAdminCases(rows) {
+      const body = document.getElementById("adminCaseTableBody");
+      const empty = document.getElementById("adminCaseEmpty");
+      if (!rows.length) {
+        body.innerHTML = "";
+        empty.hidden = false;
+        return;
+      }
+
+      empty.hidden = true;
+      body.innerHTML = rows.map((item) => `
+        <tr>
+          <td>
+            <strong>${safeText(item.patient_name || item.full_name || `Case #${item.id}`)}</strong>
+            <span>#${safeText(item.id)}</span>
+          </td>
+          <td>${safeText(item.risk_level || "Unknown")}</td>
+          <td>${formatRiskPercent(item.risk_probability)}</td>
+          <td>${safeText(item.status || "Pending")}</td>
+          <td>${safeText(item.doctor_decision || "Not reviewed")}</td>
+          <td>${safeText(formatDateTime(item.created_at))}</td>
+        </tr>
+      `).join("");
+    }
+
+    async function loadPredictionLogsPanel() {
+      showPanel("adminCasePanel");
+      showAdminMessage("Loading prediction logs...", "info");
+      try {
+        const rows = await fetchAdminCases();
+        renderAdminCases(rows);
+        showAdminMessage("Prediction logs loaded.", "success");
+      } catch (error) {
+        renderAdminCases([]);
+        showAdminMessage(error.message || "Unable to load prediction logs.", "error");
+      }
+    }
+
+    async function loadActivityPanel() {
+      showPanel("adminActivityPanel");
+      showAdminMessage("Loading activity monitor...", "info");
+      const list = document.getElementById("adminActivityList");
+      try {
+        const rows = await fetchAdminAuditLog();
+        if (!rows.length) {
+          list.innerHTML = `<li><span>No activity events available yet.</span></li>`;
+        } else {
+          list.innerHTML = rows.map((item) => `
+            <li>
+              <strong>${safeText(item.type)} | ${safeText(item.title)}</strong>
+              <span>${safeText(item.description)} ${item.created_at ? `| ${safeText(formatDateTime(item.created_at))}` : ""}</span>
+            </li>
+          `).join("");
+        }
+        showAdminMessage("Activity monitor loaded.", "success");
+      } catch (error) {
+        list.innerHTML = `<li><span>Unable to load activity monitor.</span></li>`;
+        showAdminMessage(error.message || "Unable to load activity monitor.", "error");
+      }
+    }
 
     async function loadAdminDashboard() {
       try {
@@ -95,13 +211,13 @@
 
         list.innerHTML = recent.map(item => `
           <li>
-            <strong>Prediction #${item.id} • ${item.risk_level}</strong>
+            <strong>${safeText(item.full_name || `Prediction #${item.id}`)} | ${safeText(item.risk_level)}</strong>
             <span>
-              Risk: ${formatRiskPercent(item.risk_probability)} •
-              Age: ${item.age} •
-              BP: ${item.trestbps} •
-              Chol: ${item.chol} •
-              ${formatDateTime(item.created_at)}
+              Risk: ${formatRiskPercent(item.risk_probability)} |
+              Age: ${safeText(item.age)} |
+              BP: ${safeText(item.trestbps)} |
+              Chol: ${safeText(item.chol)} |
+              ${safeText(formatDateTime(item.created_at))}
             </span>
           </li>
         `).join("");
@@ -112,8 +228,10 @@
     }
 
     manageUsersBtn.addEventListener("click", () => {
-      window.location.href = "admin/users/";
+      window.location.href = "admin/users/index.html";
     });
+    viewPredictionLogsBtn.addEventListener("click", loadPredictionLogsPanel);
+    monitorActivityBtn.addEventListener("click", loadActivityPanel);
 
     loadAdminDashboard();
   </script>

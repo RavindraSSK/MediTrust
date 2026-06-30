@@ -2,9 +2,9 @@ import {
   renderPasswordRules,
   isPasswordValid,
   getPasswordValidationMessage,
-} from "./password-rules.js?v=20260418f";
-import { attachPasswordToggle } from "./password-toggle.js?v=20260418f";
-import { registerUser } from "../services/api.js?v=20260418f";
+} from "./password-rules.js?v=20260429c";
+import { attachPasswordToggle } from "./password-toggle.js?v=20260429c";
+import { registerUser } from "../services/api.js?v=20260429c";
 
 export function initSignupPage() {
   const signupForm = document.getElementById("signupForm");

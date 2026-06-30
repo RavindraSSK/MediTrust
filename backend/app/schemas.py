@@ -71,6 +71,11 @@ class DoctorNurseAssignmentIn(BaseModel):
     nurse_id: int
 
 
+class TriageDecisionIn(BaseModel):
+    decision: str
+    note: Optional[str] = None
+
+
 class PredictRequest(BaseModel):
     first_name: str
     last_name: str

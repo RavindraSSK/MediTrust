@@ -1,9 +1,10 @@
-import { PAGE_LOGIN } from "../config.js?v=20260418f";
-import { go, $, setText } from "../utils.js?v=20260418f";
-import { isLoggedIn, logout, getCurrentUser } from "../auth/session.js?v=20260418f";
-import { getMediTrustElements } from "./form.js?v=20260418f";
-import { handlePrediction } from "./predict.js?v=20260418f";
-import { clearError } from "./render.js?v=20260418f";
+import { PAGE_LOGIN } from "../config.js?v=20260609a";
+import { go, $, setText } from "../utils.js?v=20260609a";
+import { isLoggedIn, logout, getCurrentUser } from "../auth/session.js?v=20260609a";
+import { getMediTrustElements } from "./form.js?v=20260609a";
+import { handlePrediction } from "./predict.js?v=20260609a";
+import { clearError } from "./render.js?v=20260609a";
+import { downloadLatestRiskReport } from "./report.js?v=20260609a";
 
 function getDashboardPageForRole(role) {
   if (role === "Doctor") return "doctor-dashboard.html";
@@ -71,6 +72,9 @@ export function initMediTrustPage() {
 
   elements.form?.addEventListener("submit", handler);
   elements.btn?.addEventListener("click", handler);
+  elements.downloadReportBtn?.addEventListener("click", () => {
+    downloadLatestRiskReport(elements, user);
+  });
 
   clearError();
 }

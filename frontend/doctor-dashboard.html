@@ -38,13 +38,14 @@
         </div>
       </section>
 
-      <section class="dashboard-grid">
+      <section class="dashboard-grid dashboard-grid-three">
         <div class="panel-box">
           <h2>Quick Actions</h2>
           <div class="action-list">
             <a href="meditrust.html" class="action-btn">Open Patient Assessment</a>
-            <button class="action-btn action-btn-secondary" type="button">View Explainability Insights</button>
+            <button id="viewExplainabilityBtn" class="action-btn action-btn-secondary" type="button">View Explainability Insights</button>
           </div>
+          <div id="doctorWorkflowMessage" class="workflow-message" role="status"></div>
         </div>
 
         <div class="panel-box">
@@ -53,26 +54,66 @@
             <li><span>Loading urgent cases...</span></li>
           </ul>
         </div>
+
+        <div class="panel-box">
+          <h2>Nurse Escalations</h2>
+          <ul class="alert-list" id="doctorEscalationList">
+            <li><span>Loading escalated cases...</span></li>
+          </ul>
+        </div>
       </section>
 
       <section class="panel-box wide-panel">
-        <h2>Recent Urgent Case Details</h2>
+        <h2>Selected Case Details</h2>
         <div id="doctorCaseDetails" class="doctor-case-details">
-          <div class="scope-item">Select or review urgent cases from the alert list above.</div>
+          <div class="scope-item">Select a case from urgent alerts or nurse escalations.</div>
+        </div>
+        <div id="doctorDecisionPanel" class="doctor-decision-panel" hidden>
+          <h3>Triage Decision</h3>
+          <p>Record a student-project-safe decision-support disposition for the escalated case.</p>
+          <div class="decision-grid">
+            <button class="mini-btn decision-btn" type="button" data-decision="Immediate physician review">Immediate Review</button>
+            <button class="mini-btn decision-btn" type="button" data-decision="Priority monitoring">Priority Monitoring</button>
+            <button class="mini-btn decision-btn" type="button" data-decision="Routine follow-up">Routine Follow-up</button>
+          </div>
+          <label class="decision-note-label" for="doctorDecisionNote">Review note</label>
+          <textarea id="doctorDecisionNote" class="decision-note" rows="3" placeholder="Optional note for the demo workflow"></textarea>
         </div>
       </section>
     </section>
   </main>
+
+  <div id="explainabilityModal" class="clinical-modal" hidden>
+    <div class="clinical-modal-backdrop" data-close-modal="true"></div>
+    <section class="clinical-modal-panel" role="dialog" aria-modal="true" aria-labelledby="explainabilityTitle">
+      <header class="clinical-modal-header">
+        <div>
+          <h2 id="explainabilityTitle">Explainability Insights</h2>
+          <p>Clinical model reasoning for the selected case</p>
+        </div>
+        <button id="closeExplainabilityModal" class="mini-btn" type="button">Close</button>
+      </header>
+      <div id="explainabilityModalBody" class="clinical-modal-body">
+        <div class="empty-clinical-note">Loading insights...</div>
+      </div>
+    </section>
+  </div>
 
   <script type="module">
     import {
       getCurrentUser,
       attachLogout,
       fetchUrgentCases,
+      fetchDoctorEscalations,
       fetchDashboardSummary,
+      fetchExplainability,
+      saveDoctorDecision,
+      renderExplainabilityModal,
       formatRiskPercent,
       formatDateTime,
-      buildDoctorAlertMessage
+      buildDoctorAlertMessage,
+      safeText,
+      formatNumber
     } from "./js/dashboard.js";
 
     const user = getCurrentUser("Doctor");
@@ -84,12 +125,17 @@
 
     attachLogout();
 
+    let selectedCase = null;
+    let urgentCasesCache = [];
+    let escalationsCache = [];
+
     function renderCaseDetails(item) {
       const details = document.getElementById("doctorCaseDetails");
       if (!details) return;
 
       if (!item) {
-        details.innerHTML = `<div class="scope-item">No urgent case selected.</div>`;
+        details.innerHTML = `<div class="scope-item">No urgent or escalated case selected.</div>`;
+        document.getElementById("doctorDecisionPanel").hidden = true;
         return;
       }
 
@@ -97,11 +143,15 @@
         <div class="case-detail-grid">
           <div class="case-detail-card">
             <h4>Prediction ID</h4>
-            <p>#${item.id}</p>
+            <p>#${safeText(item.id)}</p>
+          </div>
+          <div class="case-detail-card">
+            <h4>Patient</h4>
+            <p>${safeText(item.patient_name || item.full_name || `Patient #${item.id}`)}</p>
           </div>
           <div class="case-detail-card">
             <h4>Risk Level</h4>
-            <p>${item.risk_level}</p>
+            <p>${safeText(item.risk_level)}</p>
           </div>
           <div class="case-detail-card">
             <h4>Risk Probability</h4>
@@ -109,24 +159,112 @@
           </div>
           <div class="case-detail-card">
             <h4>Age</h4>
-            <p>${item.age}</p>
+            <p>${safeText(formatNumber(item.age))}</p>
           </div>
           <div class="case-detail-card">
             <h4>Resting BP</h4>
-            <p>${item.trestbps} mmHg</p>
+            <p>${safeText(formatNumber(item.trestbps))} mmHg</p>
           </div>
           <div class="case-detail-card">
-            <h4>Cholesterol</h4>
-            <p>${item.chol} mg/dL</p>
+            <h4>Status</h4>
+            <p>${safeText(item.status || "Pending")}</p>
+          </div>
+          <div class="case-detail-card">
+            <h4>Decision</h4>
+            <p>${safeText(item.doctor_decision || "Not recorded")}</p>
           </div>
         </div>
         <div class="doctor-note-box">
-          <strong>Triage Message:</strong> ${buildDoctorAlertMessage(item)}
+          <strong>Triage Message:</strong> ${safeText(buildDoctorAlertMessage(item))}
         </div>
+        ${item.doctor_note ? `
+          <div class="doctor-note-box secondary-note">
+            <strong>Doctor Note:</strong> ${safeText(item.doctor_note)}
+          </div>
+        ` : ""}
         <div class="doctor-note-box secondary-note">
-          <strong>Logged:</strong> ${formatDateTime(item.created_at)}
+          <strong>Logged:</strong> ${safeText(formatDateTime(item.created_at))}
         </div>
       `;
+
+      const decisionPanel = document.getElementById("doctorDecisionPanel");
+      decisionPanel.hidden = !item.escalation_id;
+      document.getElementById("doctorDecisionNote").value = item.doctor_note || "";
+    }
+
+    function selectCase(item) {
+      selectedCase = item;
+      renderCaseDetails(item);
+      document.querySelectorAll(".doctor-alert-item").forEach((node) => {
+        node.classList.toggle("is-selected", Number(node.dataset.caseId) === Number(item?.id));
+      });
+    }
+
+    function renderDoctorList(list, items, emptyText, source) {
+      if (!items.length) {
+        list.innerHTML = `<li><span>${safeText(emptyText)}</span></li>`;
+        return;
+      }
+
+      list.innerHTML = items.map((item, index) => `
+        <li class="doctor-alert-item" data-source="${source}" data-index="${index}" data-case-id="${safeText(item.id)}">
+          <strong>${safeText(item.patient_name || item.full_name || `Prediction #${item.id}`)} - ${safeText(item.risk_level)}</strong>
+          <span>
+            Risk: ${formatRiskPercent(item.risk_probability)} -
+            Age: ${safeText(formatNumber(item.age))} -
+            ${safeText(item.status === "Reviewed" ? item.doctor_decision || "Reviewed" : buildDoctorAlertMessage(item))}
+          </span>
+        </li>
+      `).join("");
+    }
+
+    function showDoctorMessage(message, type = "info") {
+      const node = document.getElementById("doctorWorkflowMessage");
+      node.textContent = message;
+      node.className = `workflow-message workflow-${type}`;
+    }
+
+    async function openExplainability() {
+      if (!selectedCase?.id) {
+        showDoctorMessage("Select a case before viewing explainability insights.", "warning");
+        return;
+      }
+
+      const btn = document.getElementById("viewExplainabilityBtn");
+      btn.disabled = true;
+      btn.textContent = "Loading insights...";
+      try {
+        const data = await fetchExplainability(selectedCase.id);
+        renderExplainabilityModal(data);
+        showDoctorMessage("Explainability insights loaded.", "success");
+      } catch (error) {
+        showDoctorMessage(error.message || "Unable to load explainability insights.", "error");
+      } finally {
+        btn.disabled = false;
+        btn.textContent = "View Explainability Insights";
+      }
+    }
+
+    async function saveDecision(decision) {
+      if (!selectedCase?.escalation_id) {
+        showDoctorMessage("Select a nurse-escalated case before saving a decision.", "warning");
+        return;
+      }
+
+      showDoctorMessage("Saving triage decision...", "info");
+      try {
+        const note = document.getElementById("doctorDecisionNote").value.trim();
+        await saveDoctorDecision(selectedCase.escalation_id, decision, note);
+        showDoctorMessage("Doctor triage decision saved.", "success");
+        await loadDoctorDashboard();
+      } catch (error) {
+        showDoctorMessage(error.message || "Unable to save triage decision.", "error");
+      }
+    }
+
+    function closeExplainability() {
+      document.getElementById("explainabilityModal").hidden = true;
+      document.body.classList.remove("modal-open");
     }
 
     async function loadDoctorDashboard() {
@@ -136,41 +274,54 @@
         document.getElementById("doctorTotalPredictions").textContent = summary.total_predictions ?? 0;
         document.getElementById("doctorMediumCount").textContent = summary.medium_cases ?? 0;
 
-        const urgentCases = await fetchUrgentCases();
-        const list = document.getElementById("doctorUrgentList");
+        urgentCasesCache = await fetchUrgentCases();
+        renderDoctorList(
+          document.getElementById("doctorUrgentList"),
+          urgentCasesCache,
+          "No urgent high-risk cases right now.",
+          "urgent"
+        );
 
-        if (!urgentCases.length) {
-          list.innerHTML = `<li><span>No urgent high-risk cases right now.</span></li>`;
+        escalationsCache = await fetchDoctorEscalations();
+        renderDoctorList(
+          document.getElementById("doctorEscalationList"),
+          escalationsCache,
+          "No nurse-escalated cases yet.",
+          "escalation"
+        );
+
+        const firstCase = escalationsCache[0] || urgentCasesCache[0];
+        if (!firstCase) {
           renderCaseDetails(null);
           return;
         }
-
-        list.innerHTML = urgentCases.map((item, index) => `
-          <li class="doctor-alert-item" data-index="${index}">
-            <strong>Prediction #${item.id} • ${item.risk_level}</strong>
-            <span>
-              Risk: ${formatRiskPercent(item.risk_probability)} •
-              Age: ${item.age} •
-              BP: ${item.trestbps} •
-              Chol: ${item.chol} •
-              ${buildDoctorAlertMessage(item)}
-            </span>
-          </li>
-        `).join("");
-
-        renderCaseDetails(urgentCases[0]);
+        selectCase(firstCase);
 
         document.querySelectorAll(".doctor-alert-item").forEach((node) => {
           node.addEventListener("click", () => {
             const index = Number(node.dataset.index);
-            renderCaseDetails(urgentCases[index]);
+            const source = node.dataset.source === "escalation" ? escalationsCache : urgentCasesCache;
+            selectCase(source[index]);
           });
         });
       } catch (error) {
         document.getElementById("doctorUrgentList").innerHTML =
           `<li><span>Unable to load urgent cases.</span></li>`;
+        document.getElementById("doctorEscalationList").innerHTML =
+          `<li><span>Unable to load escalated cases.</span></li>`;
       }
     }
+
+    document.getElementById("viewExplainabilityBtn").addEventListener("click", openExplainability);
+    document.getElementById("doctorDecisionPanel").addEventListener("click", (event) => {
+      const button = event.target.closest("button[data-decision]");
+      if (!button) return;
+      saveDecision(button.dataset.decision);
+    });
+    document.getElementById("closeExplainabilityModal").addEventListener("click", closeExplainability);
+    document.getElementById("explainabilityModal").addEventListener("click", (event) => {
+      if (event.target.dataset.closeModal) closeExplainability();
+    });
 
     loadDoctorDashboard();
   </script>

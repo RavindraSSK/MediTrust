@@ -1,10 +1,10 @@
-import { changePassword } from "../services/api.js?v=20260418f";
+import { changePassword } from "../services/api.js?v=20260429c";
 import {
   renderPasswordRules,
   isPasswordValid,
   getPasswordValidationMessage,
-} from "./password-rules.js?v=20260418f";
-import { attachPasswordToggle } from "./password-toggle.js?v=20260418f";
+} from "./password-rules.js?v=20260429c";
+import { attachPasswordToggle } from "./password-toggle.js?v=20260429c";
 
 const form = document.getElementById("changePasswordForm");
 const message = document.getElementById("changePasswordMessage");

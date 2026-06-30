@@ -1295,6 +1295,8 @@ input:focus, select:focus{
   margin-top: 18px;
   display: flex;
   justify-content: flex-end;
+  gap: 10px;
+  flex-wrap: wrap;
 }
 
 .result-link-btn {

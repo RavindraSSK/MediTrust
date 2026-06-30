@@ -1,13 +1,13 @@
 import {
   verifyResetCode,
   resetPassword,
-} from "../services/api.js?v=20260418f";
+} from "../services/api.js?v=20260429c";
 import {
   renderPasswordRules,
   isPasswordValid,
   getPasswordValidationMessage,
-} from "./password-rules.js?v=20260418f";
-import { attachPasswordToggle } from "./password-toggle.js?v=20260418f";
+} from "./password-rules.js?v=20260429c";
+import { attachPasswordToggle } from "./password-toggle.js?v=20260429c";
 
 const RESET_FLOW_KEY = "meditrust_reset_flow";
 const form = document.getElementById("resetPasswordForm");

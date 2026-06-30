@@ -6,7 +6,7 @@
   <title>MediTrust | Risk Assessment</title>
 
   <link rel="stylesheet" href="css/meditrust.css" />
-  <script type="module" src="js/script.js?v=20260418f"></script>
+  <script type="module" src="js/script.js?v=20260609a"></script>
 </head>
 
 <body>
@@ -17,8 +17,8 @@
         <div>
           <h1>MediTrust</h1>
           <div class="subtitle">
-            Clinician risk screening tool. Enter patient details to estimate risk level.
-            This is a preliminary assessment and does not replace clinical judgement.
+            Clinician decision-support prototype for cardiovascular risk screening.
+            For decision support only, not a replacement for clinical judgment.
           </div>
 
           <div class="session-strip">
@@ -47,7 +47,7 @@
           <div class="section-header">
             <div>
               <div class="section-title">Patient Information</div>
-              <div class="section-subtitle">Enter the patient’s basic profile before clinical assessment.</div>
+              <div class="section-subtitle">Enter the patient's basic profile before clinical assessment.</div>
             </div>
           </div>
 
@@ -199,11 +199,11 @@
         <div class="risk-fluid">
           <div class="result-title">Assessment Result</div>
 
-          <div id="riskScore" class="risk-score-big">—</div>
+          <div id="riskScore" class="risk-score-big">-</div>
 
           <div class="risk-inline">
-            <div id="riskLevel" class="risk-level-text">—</div>
-            <div id="badge" class="risk-status-badge neutral">—</div>
+            <div id="riskLevel" class="risk-level-text">-</div>
+            <div id="badge" class="risk-status-badge neutral">-</div>
           </div>
 
           <div class="risk-meter">
@@ -223,6 +223,7 @@
 
           <div class="result-actions">
             <a id="returnDashboardBtn" class="btn-secondary result-link-btn" href="#">Return to Dashboard</a>
+            <button id="downloadReportBtn" class="btn-secondary result-link-btn" type="button">Download PDF Report</button>
           </div>
         </div>
       </div>
@@ -232,7 +233,7 @@
       </div>
 
       <div class="footer">
-        <div>© 2026 MediTrust</div>
+        <div>Copyright 2026 MediTrust</div>
         <div>AI-assisted screening prototype</div>
       </div>
 

@@ -1,4 +1,56 @@
-export const API_BASE = "http://127.0.0.1:8001";
+const LOCAL_FRONTEND_ORIGINS = new Set([
+  "http://127.0.0.1:5500",
+  "http://localhost:5500",
+  "http://127.0.0.1:5501",
+  "http://localhost:5501",
+  "http://127.0.0.1:5173",
+  "http://localhost:5173",
+]);
+
+const PRODUCTION_API_BASE =
+  typeof window !== "undefined"
+    ? (
+        window.location.hostname === "meditrust.ddns.net"
+          ? "https://meditrust.ddns.net/api"
+          : `${window.location.origin}/api`
+      )
+    : "https://meditrust.ddns.net/api";
+
+export const API_BASE =
+  typeof window !== "undefined" && LOCAL_FRONTEND_ORIGINS.has(window.location.origin)
+    ? "http://127.0.0.1:8001"
+    : PRODUCTION_API_BASE;
+
+async function readAuthResponse(res, fallbackMessage = "Request failed.") {
+  const raw = await res.text();
+  let data = {};
+  const trimmed = raw.trim();
+  const looksLikeHtml =
+    trimmed.startsWith("<!DOCTYPE html") ||
+    trimmed.startsWith("<html") ||
+    trimmed.startsWith("<HTML");
+
+  if (raw) {
+    try {
+      data = JSON.parse(raw);
+    } catch {
+      data = {};
+    }
+  }
+
+  if (!res.ok) {
+    return {
+      ok: false,
+      message:
+        data.message ||
+        data.detail ||
+        (!looksLikeHtml ? trimmed : "") ||
+        fallbackMessage,
+    };
+  }
+
+  return Object.keys(data).length ? data : { ok: true };
+}
 
 export async function registerUser(firstName, lastName, email, password, role = "Doctor", hospitalName = "") {
   const res = await fetch(`${API_BASE}/auth/register`, {
@@ -14,7 +66,7 @@ export async function registerUser(firstName, lastName, email, password, role = 
     }),
   });
 
-  return await res.json();
+  return await readAuthResponse(res, "Registration failed.");
 }
 
 export async function loginUser(email, password) {
@@ -24,7 +76,7 @@ export async function loginUser(email, password) {
     body: JSON.stringify({ email, password }),
   });
 
-  return await res.json();
+  return await readAuthResponse(res, "Login failed.");
 }
 
 export async function requestPasswordReset(email) {
@@ -34,7 +86,7 @@ export async function requestPasswordReset(email) {
     body: JSON.stringify({ email }),
   });
 
-  return await res.json();
+  return await readAuthResponse(res, "Unable to request reset code.");
 }
 
 export async function verifyResetCode(email, code) {
@@ -44,7 +96,7 @@ export async function verifyResetCode(email, code) {
     body: JSON.stringify({ email, code }),
   });
 
-  return await res.json();
+  return await readAuthResponse(res, "Unable to verify reset code.");
 }
 
 export async function resetPassword(email, newPassword) {
@@ -57,7 +109,7 @@ export async function resetPassword(email, newPassword) {
     }),
   });
 
-  return await res.json();
+  return await readAuthResponse(res, "Unable to reset password.");
 }
 
 export async function changePassword(email, currentPassword, newPassword) {
@@ -71,7 +123,7 @@ export async function changePassword(email, currentPassword, newPassword) {
     }),
   });
 
-  return await res.json();
+  return await readAuthResponse(res, "Unable to change password.");
 }
 
 export async function assessRisk(firstName, lastName, age) {

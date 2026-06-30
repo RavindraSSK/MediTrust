@@ -1,6 +1,7 @@
 # Python
 __pycache__/
 *.pyc
+.codex_tmp_pycache/
 
 # Virtual environments
 .venv/

@@ -1,7 +1,7 @@
-import { safeNumber } from "../utils.js?v=20260418f";
-import { API_BASE, predictRisk, assessRisk } from "../services/api.js?v=20260418f";
-import { renderError, clearError, renderRiskResult } from "./render.js?v=20260418f";
-import { buildPredictPayload } from "./form.js?v=20260418f";
+import { safeNumber } from "../utils.js?v=20260609a";
+import { API_BASE, predictRisk, assessRisk } from "../services/api.js?v=20260609a";
+import { renderError, clearError, renderRiskResult } from "./render.js?v=20260609a";
+import { buildPredictPayload } from "./form.js?v=20260609a";
 
 export async function handlePrediction(elements, currentUser = null) {
   clearError();
@@ -15,7 +15,7 @@ export async function handlePrediction(elements, currentUser = null) {
     return renderError("Please enter the patient's first and last name.");
   }
   if (age === null || age < 1 || age > 120) {
-    return renderError("Please enter a valid age (1–120).");
+    return renderError("Please enter a valid age (1-120).");
   }
 
   if (elements.btn) {
@@ -59,8 +59,10 @@ export async function handlePrediction(elements, currentUser = null) {
       }
 
       data = await predictRisk(payload);
+      data.clinical_inputs = payload;
     } else {
       data = await assessRisk(firstName, lastName, age);
+      data.clinical_inputs = { first_name: firstName, last_name: lastName, age };
     }
 
     data.patient_name = name;

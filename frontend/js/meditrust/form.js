@@ -19,6 +19,7 @@ export function getMediTrustElements() {
     slopeEl: pickId("slope"),
     caEl: pickId("ca"),
     thalEl: pickId("thal"),
+    downloadReportBtn: pickId("downloadReportBtn"),
   };
 }
 

@@ -1,6 +1,6 @@
-import { storeCurrentUser } from "./session.js?v=20260418f";
-import { attachPasswordToggle } from "./password-toggle.js?v=20260418f";
-import { loginUser } from "../services/api.js?v=20260418f";
+import { storeCurrentUser } from "./session.js?v=20260429c";
+import { attachPasswordToggle } from "./password-toggle.js?v=20260429c";
+import { loginUser } from "../services/api.js?v=20260429c";
 
 export function initLoginPage() {
   const loginForm = document.getElementById("loginForm");

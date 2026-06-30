@@ -1,5 +1,11 @@
 import { pickId, setText, show, safeNumber } from "../utils.js";
 
+let latestRiskResult = null;
+
+export function getLatestRiskResult() {
+  return latestRiskResult;
+}
+
 function getClinicalFeatureLabel(feature) {
   const labels = {
     age: "age",
@@ -137,7 +143,7 @@ function buildDirectionFallback(label, directionText) {
 }
 
 // These ranges are based on common U.S. clinical reference categories for plain-language explanation
-// and should not replace medical judgement or individualized clinical assessment.
+// and should not replace medical judgment or individualized clinical assessment.
 function buildFeatureExplanation(item) {
   const feature = item?.feature;
   const value = safeNumber(item?.value);
@@ -349,7 +355,7 @@ function renderWaterfall(baseValue, finalProbability, features) {
           ${item.impact >= 0 ? "+" : ""}${item.impact.toFixed(3)}
         </div>
         <div class="waterfall-range">
-          ${before.toFixed(3)} → ${after.toFixed(3)}
+          ${before.toFixed(3)} -> ${after.toFixed(3)}
         </div>
       </div>
     `;
@@ -384,7 +390,7 @@ function renderWorkflowNotice(data) {
     html = `
       <div class="workflow-banner workflow-high">
         <strong>High Risk Detected:</strong>
-        Doctor has been notified for immediate review. Prepare the patient for urgent physician evaluation.
+        This case is ready for nurse escalation to a doctor. Use the nurse dashboard to escalate high-risk cases.
       </div>
     `;
   } else if (role === "Nurse" && riskLevel === "Medium") {
@@ -398,7 +404,7 @@ function renderWorkflowNotice(data) {
     html = `
       <div class="workflow-banner workflow-doctor">
         <strong>Doctor Review Mode:</strong>
-        Use this prediction together with clinical examination, symptoms, and professional judgement before final action.
+        Use this prediction together with clinical examination, symptoms, and professional judgment before final action.
       </div>
     `;
   } else if (role === "Admin") {
@@ -412,7 +418,7 @@ function renderWorkflowNotice(data) {
     html = `
       <div class="workflow-banner">
         <strong>Clinical Workflow:</strong>
-        This result should be interpreted within the care workflow and does not replace clinician judgement.
+        This result should be interpreted within the care workflow and does not replace clinician judgment.
       </div>
     `;
   }
@@ -422,6 +428,8 @@ function renderWorkflowNotice(data) {
 }
 
 export function renderRiskResult(data) {
+  latestRiskResult = data;
+
   const riskLevelEl = pickId("riskLevel");
   const riskScoreEl = pickId("riskScore");
 

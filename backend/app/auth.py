@@ -5,7 +5,8 @@ from passlib.context import CryptContext
 from .db import get_db
 from .models import User
 from .otp_service import otp_store
-from .email_service import send_reset_code_email
+from .email_service import EMAIL_LOGGED, EmailDeliveryError, send_reset_code_email
+from .password_utils import validate_password_for_bcrypt
 from .schemas import (
     ForgotPasswordIn,
     VerifyResetCodeIn,
@@ -31,11 +32,22 @@ def request_reset(data: ForgotPasswordIn, db: Session = Depends(get_db)):
         }
 
     code = otp_store.generate_code(email)
-    send_reset_code_email(email, code)
+    try:
+        delivery_mode = send_reset_code_email(email, code)
+    except EmailDeliveryError:
+        otp_store.clear(email)
+        return {
+            "ok": False,
+            "message": "Unable to send the reset code email. Please try again later.",
+        }
 
     return {
         "ok": True,
-        "message": "A 6-digit reset code has been sent to your email."
+        "message": (
+            "Email delivery is not configured yet. The reset code is available in the server log."
+            if delivery_mode == EMAIL_LOGGED
+            else "A 6-digit reset code has been sent to your email."
+        )
     }
 
 
@@ -60,7 +72,11 @@ def reset_password(data: ResetPasswordIn, db: Session = Depends(get_db)):
     if not user:
         return {"ok": False, "message": "User not found."}
 
-    user.password_hash = pwd_context.hash(data.new_password)
+    password, password_error = validate_password_for_bcrypt(data.new_password)
+    if password_error:
+        return {"ok": False, "message": password_error}
+
+    user.password_hash = pwd_context.hash(password)
     db.commit()
     otp_store.clear(email)
 
@@ -75,10 +91,15 @@ def change_password(data: ChangePasswordIn, db: Session = Depends(get_db)):
     if not user:
         return {"ok": False, "message": "User not found."}
 
-    if not pwd_context.verify(data.current_password, user.password_hash):
+    current_password, _ = validate_password_for_bcrypt(data.current_password)
+    if not pwd_context.verify(current_password, user.password_hash):
         return {"ok": False, "message": "Current password is incorrect."}
 
-    user.password_hash = pwd_context.hash(data.new_password)
+    new_password, password_error = validate_password_for_bcrypt(data.new_password)
+    if password_error:
+        return {"ok": False, "message": password_error}
+
+    user.password_hash = pwd_context.hash(new_password)
     db.commit()
 
     return {"ok": True, "message": "Password changed successfully."}

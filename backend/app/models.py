@@ -67,3 +67,19 @@ class PredictionLog(Base):
     risk_level = Column(String)
 
     created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+
+class CaseEscalation(Base):
+    __tablename__ = "case_escalations"
+    __table_args__ = (
+        UniqueConstraint("case_id", name="uq_case_escalation_case_id"),
+    )
+
+    id = Column(Integer, primary_key=True, index=True)
+    case_id = Column(Integer, ForeignKey("prediction_logs.id"), nullable=False, index=True)
+    nurse_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+    status = Column(String, nullable=False, default="Escalated")
+    doctor_decision = Column(String, nullable=True)
+    doctor_note = Column(String, nullable=True)
+    reviewed_at = Column(DateTime(timezone=True), nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
