@@ -1,13 +1,16 @@
-from fastapi import FastAPI, Depends, Header, HTTPException
+from fastapi import FastAPI, Depends, Header, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 from sqlalchemy import text
 from passlib.context import CryptContext
 from dotenv import load_dotenv
 import os
+import secrets
 
 load_dotenv()
 from .db import Base, engine, get_db, SessionLocal
+from .rate_limit import LoginRateLimiter
 from . import models
 from .models import User
 from .schemas import (
@@ -31,10 +34,32 @@ app = FastAPI(title="MediTrust API", version="0.1")
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
-UNIVERSAL_ADMIN_EMAIL = "meditrust@gmail.com"
-UNIVERSAL_ADMIN_PASSWORD = "Meditrust@12"
+# Admin credentials are sourced from the environment so they are never
+# committed to source control. The email defaults to a stable value (it is
+# not a secret), but the password must come from ADMIN_PASSWORD. If it is not
+# set, a one-time random password is generated when the admin is first created
+# and printed to the logs so the operator can capture it.
+ADMIN_EMAIL = (os.getenv("ADMIN_EMAIL") or "meditrust@gmail.com").lower().strip()
 UNIVERSAL_ADMIN_ROLE = "Admin"
 UNIVERSAL_ADMIN_STATUS = "approved"
+
+# Brute-force protection for /auth/login (per email + client IP).
+login_rate_limiter = LoginRateLimiter(max_attempts=5, window_seconds=900)
+
+
+def _get_admin_password_from_env() -> str | None:
+    value = os.getenv("ADMIN_PASSWORD")
+    if value is None:
+        return None
+    value = value.strip()
+    return value or None
+
+
+def get_client_ip(request: Request) -> str:
+    forwarded = request.headers.get("x-forwarded-for")
+    if forwarded:
+        return forwarded.split(",")[0].strip()
+    return request.client.host if request.client else "unknown"
 
 ALLOWED_ORIGINS = [
     "http://127.0.0.1:5500",
@@ -212,20 +237,33 @@ def serialize_user(user: User):
 
 
 def is_universal_admin(user: User) -> bool:
-    return (user.email or "").lower().strip() == UNIVERSAL_ADMIN_EMAIL
+    return (user.email or "").lower().strip() == ADMIN_EMAIL
 
 
 def ensure_universal_admin(db: Session):
-    admin = db.query(User).filter(User.email == UNIVERSAL_ADMIN_EMAIL).first()
-    password_hash = pwd_context.hash(UNIVERSAL_ADMIN_PASSWORD)
+    admin = db.query(User).filter(User.email == ADMIN_EMAIL).first()
+    env_password = _get_admin_password_from_env()
 
     if not admin:
+        if env_password:
+            password = env_password
+        else:
+            password = secrets.token_urlsafe(16)
+            print(
+                f"[MediTrust] ADMIN_PASSWORD is not set. Generated a one-time admin "
+                f"password for {ADMIN_EMAIL}: {password}"
+            )
+            print(
+                "[MediTrust] Set ADMIN_PASSWORD in the environment and restart to "
+                "control this credential."
+            )
+
         admin = User(
             full_name="MediTrust Admin",
             first_name="MediTrust",
             last_name="Admin",
-            email=UNIVERSAL_ADMIN_EMAIL,
-            password_hash=password_hash,
+            email=ADMIN_EMAIL,
+            password_hash=pwd_context.hash(password),
             role=UNIVERSAL_ADMIN_ROLE,
             role_status=UNIVERSAL_ADMIN_STATUS,
             hospital_name="MediTrust",
@@ -241,8 +279,12 @@ def ensure_universal_admin(db: Session):
     if (getattr(admin, "role_status", None) or "").lower() != UNIVERSAL_ADMIN_STATUS:
         admin.role_status = UNIVERSAL_ADMIN_STATUS
         changed = True
-    if not pwd_context.verify(UNIVERSAL_ADMIN_PASSWORD, admin.password_hash):
-        admin.password_hash = password_hash
+    # Only (re)set the password from the environment when ADMIN_PASSWORD is
+    # explicitly provided. This lets operators rotate the credential via the
+    # environment, while no longer clobbering a password that an admin changed
+    # in-app whenever the env var is unset.
+    if env_password and not pwd_context.verify(env_password, admin.password_hash):
+        admin.password_hash = pwd_context.hash(env_password)
         changed = True
 
     if changed:
@@ -352,15 +394,34 @@ def register(data: RegisterIn, db: Session = Depends(get_db)):
 
 
 @app.post("/auth/login")
-def login(data: LoginIn, db: Session = Depends(get_db)):
+def login(data: LoginIn, request: Request, db: Session = Depends(get_db)):
     email = data.email.lower().strip()
+    rate_limit_key = f"{email}|{get_client_ip(request)}"
+
+    retry_after = login_rate_limiter.seconds_until_unblocked(rate_limit_key)
+    if retry_after:
+        return JSONResponse(
+            status_code=429,
+            content={
+                "ok": False,
+                "message": (
+                    "Too many failed login attempts. Please try again in "
+                    f"{retry_after} seconds."
+                ),
+            },
+            headers={"Retry-After": str(retry_after)},
+        )
 
     user = db.query(User).filter(User.email == email).first()
     if not user:
+        login_rate_limiter.register_failure(rate_limit_key)
         return {"ok": False, "message": "Invalid email or password."}
 
     if not pwd_context.verify(data.password, user.password_hash):
+        login_rate_limiter.register_failure(rate_limit_key)
         return {"ok": False, "message": "Invalid email or password."}
+
+    login_rate_limiter.reset(rate_limit_key)
 
     role_status = getattr(user, "role_status", "approved") or "approved"
     if role_status != "approved":

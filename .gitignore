@@ -13,6 +13,9 @@ backend/.env
 .DS_Store
 Thumbs.db
 
+# Local dev SQLite database
+*.db
+
 # Logs
 *.log
 
