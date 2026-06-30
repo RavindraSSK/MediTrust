@@ -16,7 +16,14 @@ The update script installs `backend/requirements.txt` into the system Python (`p
 
 - Local dev uses **SQLite** via `DATABASE_URL` in `backend/.env` (e.g. `sqlite:////workspace/backend/meditrust_dev.db`). The app code supports both SQLite and PostgreSQL; tables are auto-created and migrated on startup (no manual migration step). The local `.db` file is gitignored.
 - The repo also ships `docker-compose.yml` for a PostgreSQL 16 container (port 5433), which is the production-like option. Docker is NOT installed in this environment; prefer SQLite here. To use Postgres instead, start the container and set `DATABASE_URL=postgresql+psycopg2://meditrust:meditrust_pw@127.0.0.1:5433/meditrust_db`.
-- On startup the backend seeds a permanent admin account: `meditrust@gmail.com` / `Meditrust@12`. The first-ever registered user is auto-approved; any later signup is created with `role_status="pending"` and an admin must approve it before that account can log in.
+- On startup the backend seeds a permanent admin account. The email defaults to `meditrust@gmail.com` (override with `ADMIN_EMAIL`) and the password comes from the `ADMIN_PASSWORD` env var. The update script seeds `ADMIN_PASSWORD=DevAdmin@2026` into a freshly created `backend/.env`, so the local dev admin is `meditrust@gmail.com` / `DevAdmin@2026`. If `ADMIN_PASSWORD` is unset when the admin is first created, a random one-time password is generated and printed to the backend log. The first-ever registered user is auto-approved; any later signup is created with `role_status="pending"` and an admin must approve it before that account can log in.
+- `/auth/login` is rate-limited per email+IP (5 failed attempts per 15-minute window → HTTP 429 with a `Retry-After` header). A successful login clears the counter. The limiter is in-memory/per-process, so multi-worker (gunicorn `-w N`) deployments track it per worker.
+
+### Deployment (AWS EC2)
+
+- Production runs gunicorn (see `backend/startup.txt`): `gunicorn -w 2 -k uvicorn.workers.UvicornWorker -b 0.0.0.0:8000 app.main:app`.
+- **Set a strong `ADMIN_PASSWORD` in the production `backend/.env`.** Because the admin row already exists in prod, the password is only rotated when `ADMIN_PASSWORD` is explicitly set; if it is unset the existing (old) password is left unchanged.
+- No DB migration step is required; `create_all` + `migrate_name_columns()` run on startup and are Postgres-safe.
 
 ### ML model artifacts
 
