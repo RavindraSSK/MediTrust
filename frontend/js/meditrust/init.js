@@ -1,10 +1,10 @@
-import { PAGE_LOGIN } from "../config.js?v=20260609a";
-import { go, $, setText } from "../utils.js?v=20260609a";
-import { isLoggedIn, logout, getCurrentUser } from "../auth/session.js?v=20260609a";
-import { getMediTrustElements } from "./form.js?v=20260609a";
-import { handlePrediction } from "./predict.js?v=20260609a";
-import { clearError } from "./render.js?v=20260609a";
-import { downloadLatestRiskReport } from "./report.js?v=20260609a";
+import { PAGE_LOGIN } from "../config.js?v=20260701a";
+import { go, $, setText } from "../utils.js?v=20260701a";
+import { isLoggedIn, logout, getCurrentUser } from "../auth/session.js?v=20260701a";
+import { getMediTrustElements } from "./form.js?v=20260701a";
+import { handlePrediction } from "./predict.js?v=20260701a";
+import { clearError } from "./render.js?v=20260701a";
+import { downloadLatestRiskReport } from "./report.js?v=20260701a";
 
 function getDashboardPageForRole(role) {
   if (role === "Doctor") return "doctor-dashboard.html";

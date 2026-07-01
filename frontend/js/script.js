@@ -6,10 +6,10 @@ import {
   PAGE_RESET,
   PAGE_CHANGE_PASSWORD,
 } from "./config.js";
-import { initLoginPage } from "./auth/login.js?v=20260429c";
-import { initSignupPage } from "./auth/signup.js?v=20260429c";
-import { initMediTrustPage } from "./meditrust/init.js?v=20260609a";
-import { initPatientsPage } from "./patients.js?v=20260429c";
+import { initLoginPage } from "./auth/login.js?v=20260701a";
+import { initSignupPage } from "./auth/signup.js?v=20260701a";
+import { initMediTrustPage } from "./meditrust/init.js?v=20260701a";
+import { initPatientsPage } from "./patients.js?v=20260701a";
 
 document.addEventListener("DOMContentLoaded", () => {
   const file = (window.location.pathname.split("/").pop() || "").toLowerCase();

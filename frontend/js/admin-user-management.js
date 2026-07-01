@@ -9,7 +9,7 @@ import {
   createDoctorNurseAssignment,
   deleteDoctorNurseAssignment,
   formatDateTime
-} from "./dashboard.js?v=20260429c";
+} from "./dashboard.js?v=20260701a";
 
 const roles = ["Doctor", "Nurse", "Admin"];
 const UNIVERSAL_ADMIN_EMAIL = "meditrust@gmail.com";

@@ -1,7 +1,7 @@
-import { PAGE_LOGIN } from "./config.js?v=20260429c";
-import { API_BASE } from "./services/api.js?v=20260429c";
-import { $, go, setText } from "./utils.js?v=20260429c";
-import { isLoggedIn, getCurrentUser, logout } from "./auth/session.js?v=20260429c";
+import { PAGE_LOGIN } from "./config.js?v=20260701a";
+import { API_BASE } from "./services/api.js?v=20260701a";
+import { $, go, setText } from "./utils.js?v=20260701a";
+import { isLoggedIn, getCurrentUser, logout } from "./auth/session.js?v=20260701a";
 
 function getDisplayName(user) {
   if (!user) return "";

@@ -1,7 +1,7 @@
-import { safeNumber } from "../utils.js?v=20260609a";
-import { API_BASE, predictRisk, assessRisk } from "../services/api.js?v=20260609a";
-import { renderError, clearError, renderRiskResult } from "./render.js?v=20260609a";
-import { buildPredictPayload } from "./form.js?v=20260609a";
+import { safeNumber } from "../utils.js?v=20260701a";
+import { API_BASE, predictRisk, assessRisk } from "../services/api.js?v=20260701a";
+import { renderError, clearError, renderRiskResult } from "./render.js?v=20260701a";
+import { buildPredictPayload } from "./form.js?v=20260701a";
 
 export async function handlePrediction(elements, currentUser = null) {
   clearError();

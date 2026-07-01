@@ -1,4 +1,4 @@
-import { getLatestRiskResult } from "./render.js?v=20260609a";
+import { getLatestRiskResult } from "./render.js?v=20260701a";
 
 const FEATURE_LABELS = {
   age: "Age",

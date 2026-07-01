@@ -1,4 +1,4 @@
-import { API_BASE } from "./services/api.js?v=20260429c";
+import { API_BASE } from "./services/api.js?v=20260701a";
 
 function getLoginPagePath() {
   const frontendMarker = "/frontend/";
