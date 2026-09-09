@@ -38,7 +38,7 @@ def ensure_universal_admin(db: Session) -> None:
     """
     Seed (or repair) the universal admin account. The password is only ever
     (re)set from ADMIN_PASSWORD; when it is unset and the account does not
-    exist, a one-time password is generated and logged.
+    exist, a one-time password is generated.
     """
     admin_email = settings.admin_email
     env_password = settings.admin_password or None
@@ -48,10 +48,9 @@ def ensure_universal_admin(db: Session) -> None:
         password = env_password or secrets.token_urlsafe(16)
         if not env_password:
             logger.warning(
-                "ADMIN_PASSWORD is not set. Generated a one-time admin password for %s: %s "
+                "ADMIN_PASSWORD is not set. Generated a one-time admin password for %s "
                 "(set ADMIN_PASSWORD and restart to control this credential)",
                 admin_email,
-                password,
             )
         admin = User(
             full_name="MediTrust Admin",
