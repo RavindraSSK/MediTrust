@@ -77,13 +77,32 @@ if [[ "$PUBLIC_IP" != "None" && -n "$PUBLIC_IP" ]]; then
   echo
   echo "== Is the application answering on ${PUBLIC_IP}? =="
   APP_UP=0
+  probe() {  # never let a curl failure abort the script; %{http_code} is 000 when it fails
+    curl -s -o /dev/null -m 8 -w '%{http_code}' "$@" 2>/dev/null || true
+  }
   for URL in "http://${PUBLIC_IP}/api/health/ready" "http://${PUBLIC_IP}:8000/health/ready" "http://${PUBLIC_IP}/"; do
-    CODE="$(curl -s -o /dev/null -m 8 -w '%{http_code}' "$URL" 2>/dev/null || echo 000)"
+    CODE="$(probe "$URL")"
     case "$CODE" in
-      000) echo "  $URL -> no response (nothing listening, or blocked)" ;;
+      000) echo "  $URL -> no response (nothing listening on that port, or blocked)" ;;
       200) echo "  $URL -> $CODE OK"; APP_UP=1 ;;
+      30*) echo "  $URL -> $CODE redirect (usually nginx sending HTTP to HTTPS)"; APP_UP=1 ;;
       *)   echo "  $URL -> $CODE"; APP_UP=1 ;;
     esac
+  done
+
+  # Decisive test: pretend DNS already points at this IP, and use the real hostname so TLS
+  # and the certificate are exercised exactly as a browser would. -k tolerates a self-signed
+  # or expired certificate so we still learn whether the application itself answers.
+  echo "  --- as ${PUBLIC_HOST} would see it (DNS forced to ${PUBLIC_IP}) ---"
+  for SCHEME in http https; do
+    PORT=80; [[ "$SCHEME" == "https" ]] && PORT=443
+    CODE="$(probe -k -L --resolve "${PUBLIC_HOST}:${PORT}:${PUBLIC_IP}" "${SCHEME}://${PUBLIC_HOST}/api/health/ready")"
+    if [[ "$CODE" == "200" ]]; then
+      echo "  ${SCHEME}://${PUBLIC_HOST}/api/health/ready -> 200 OK   <-- the site works once DNS is updated"
+      APP_UP=1
+    else
+      echo "  ${SCHEME}://${PUBLIC_HOST}/api/health/ready -> ${CODE:-000}"
+    fi
   done
 fi
 
