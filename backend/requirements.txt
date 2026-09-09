@@ -1,15 +1,35 @@
-fastapi
-uvicorn[standard]
-gunicorn
-SQLAlchemy
-psycopg2-binary
-python-dotenv
-passlib
+# Web API
+fastapi>=0.110,<1
+uvicorn[standard]>=0.27
+gunicorn>=21
+python-dotenv>=1.0
+email-validator>=2.0
+pydantic>=2.5,<3
+
+# Database
+SQLAlchemy>=2.0,<3
+psycopg2-binary>=2.9
+
+# Auth
+passlib>=1.7
 bcrypt==4.0.1
-scikit-learn
-joblib
-numpy
-pandas
-shap
-google-genai
-email-validator
+PyJWT>=2.8
+cryptography>=41
+
+# ML runtime (pinned to the versions the committed artifacts were trained with)
+scikit-learn==1.9.0
+xgboost==3.2.0
+shap==0.51.0
+joblib>=1.4
+numpy>=1.26
+pandas>=2.2
+scipy>=1.12
+
+# LLM (optional at runtime; only used when GEMINI_API_KEY is set)
+google-genai>=1.0
+
+# Observability
+prometheus-client>=0.19
+
+# AWS (optional; only used when MODEL_S3_URI is set)
+boto3>=1.34
