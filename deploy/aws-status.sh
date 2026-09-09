@@ -9,7 +9,7 @@
 set -euo pipefail
 
 PUBLIC_HOST="${PUBLIC_HOST:-meditrust.ddns.net}"
-DEPLOY_BRANCH="${DEPLOY_BRANCH:-claude/clinical-risk-platform-completion-ohnfgm}"
+DEPLOY_BRANCH="${DEPLOY_BRANCH:-main}"
 
 # AWS CLI v2 pipes output through a pager (less) by default. On exit the pager restores the
 # terminal screen, which erases everything this script printed. Disable it globally and per call.
@@ -32,6 +32,13 @@ fi
 echo "== DNS =="
 DNS_IP="$(getent hosts "$PUBLIC_HOST" 2>/dev/null | awk '{print $1}' | head -n1 || true)"
 echo "${PUBLIC_HOST} -> ${DNS_IP:-<unresolved>}"
+if [[ -z "$DNS_IP" ]]; then
+  cat <<EOF
+  DNS is not publishing an address for ${PUBLIC_HOST}. Browsers cannot reach the
+  instance until the hostname is restored/reconfirmed in No-IP and updated to the
+  instance's public (preferably Elastic) IP.
+EOF
+fi
 
 echo
 echo "== EC2 instances in ${AWS_REGION_IN_USE} =="
@@ -72,11 +79,18 @@ done
 echo "== Elastic IPs =="
 aws --no-cli-pager ec2 describe-addresses \
   --query 'Addresses[].{IP:PublicIp,AllocationId:AllocationId,AttachedTo:InstanceId}' --output table
+AVAILABLE_EIP_ALLOCATION="$(aws --no-cli-pager ec2 describe-addresses \
+  --query 'Addresses[?AssociationId==null].AllocationId | [0]' --output text 2>/dev/null || true)"
+AVAILABLE_EIP="$(aws --no-cli-pager ec2 describe-addresses \
+  --query 'Addresses[?AssociationId==null].PublicIp | [0]' --output text 2>/dev/null || true)"
+[[ "$AVAILABLE_EIP_ALLOCATION" == "None" ]] && AVAILABLE_EIP_ALLOCATION=""
+[[ "$AVAILABLE_EIP" == "None" ]] && AVAILABLE_EIP=""
 
 if [[ "$PUBLIC_IP" != "None" && -n "$PUBLIC_IP" ]]; then
   echo
   echo "== Is the application answering on ${PUBLIC_IP}? =="
   APP_UP=0
+  SITE_RESPONDING=0
   probe() {  # never let a curl failure abort the script; %{http_code} is 000 when it fails
     curl -s -o /dev/null -m 8 -w '%{http_code}' "$@" 2>/dev/null || true
   }
@@ -84,9 +98,9 @@ if [[ "$PUBLIC_IP" != "None" && -n "$PUBLIC_IP" ]]; then
     CODE="$(probe "$URL")"
     case "$CODE" in
       000) echo "  $URL -> no response (nothing listening on that port, or blocked)" ;;
-      200) echo "  $URL -> $CODE OK"; APP_UP=1 ;;
-      30*) echo "  $URL -> $CODE redirect (usually nginx sending HTTP to HTTPS)"; APP_UP=1 ;;
-      *)   echo "  $URL -> $CODE"; APP_UP=1 ;;
+      200) echo "  $URL -> $CODE OK"; APP_UP=1; SITE_RESPONDING=1 ;;
+      30*) echo "  $URL -> $CODE redirect (usually nginx sending HTTP to HTTPS)"; SITE_RESPONDING=1 ;;
+      *)   echo "  $URL -> $CODE"; SITE_RESPONDING=1 ;;
     esac
   done
 
@@ -99,9 +113,10 @@ if [[ "$PUBLIC_IP" != "None" && -n "$PUBLIC_IP" ]]; then
     CODE="$(probe -k -L --resolve "${PUBLIC_HOST}:${PORT}:${PUBLIC_IP}" "${SCHEME}://${PUBLIC_HOST}/api/health/ready")"
     if [[ "$CODE" == "200" ]]; then
       echo "  ${SCHEME}://${PUBLIC_HOST}/api/health/ready -> 200 OK   <-- the site works once DNS is updated"
-      APP_UP=1
+      APP_UP=1; SITE_RESPONDING=1
     else
       echo "  ${SCHEME}://${PUBLIC_HOST}/api/health/ready -> ${CODE:-000}"
+      [[ "$CODE" != "000" ]] && SITE_RESPONDING=1
     fi
   done
 fi
@@ -112,16 +127,31 @@ echo "== Assessment =="
   && echo "  instance $INSTANCE_ID is running at ${PUBLIC_IP}" \
   || echo "  instance $INSTANCE_ID is '$STATE' -> start it:  aws ec2 start-instances --instance-ids $INSTANCE_ID"
 
-if [[ -n "$DNS_IP" && "$PUBLIC_IP" != "None" && "$DNS_IP" != "$PUBLIC_IP" ]]; then
+if [[ -z "$DNS_IP" && "$PUBLIC_IP" != "None" && -n "$PUBLIC_IP" ]]; then
+  echo "  DNS FAILURE: ${PUBLIC_HOST} does not currently resolve."
+  echo "  Restore/reconfirm the hostname in No-IP, then set its A record to ${PUBLIC_IP}."
+  echo "  To keep it synchronized, configure /etc/meditrust/ddns.env and re-run:"
+  echo "    sudo systemctl enable --now meditrust-ddns.timer"
+  echo "    sudo systemctl start meditrust-ddns.service"
+  echo "    sudo journalctl -u meditrust-ddns.service -n 20 --no-pager"
+elif [[ "$PUBLIC_IP" != "None" && "$DNS_IP" != "$PUBLIC_IP" ]]; then
   echo "  DNS MISMATCH: ${PUBLIC_HOST} points at ${DNS_IP} but the instance is at ${PUBLIC_IP}."
-  echo "  Update the No-IP record, and allocate an Elastic IP so the address stops changing:"
-  echo "    aws ec2 allocate-address --domain vpc"
-  echo "    aws ec2 associate-address --instance-id $INSTANCE_ID --allocation-id <eipalloc-...>"
+  if [[ -n "$AVAILABLE_EIP_ALLOCATION" && -n "$AVAILABLE_EIP" ]]; then
+    echo "  An unattached Elastic IP already exists; use it instead of allocating another one:"
+    echo "    aws ec2 associate-address --instance-id $INSTANCE_ID --allocation-id $AVAILABLE_EIP_ALLOCATION"
+    echo "  After association completes, set the No-IP A record for ${PUBLIC_HOST} to ${AVAILABLE_EIP}."
+  else
+    echo "  Allocate and associate an Elastic IP so the address stops changing:"
+    echo "    ALLOCATION_ID=\$(aws ec2 allocate-address --domain vpc --query AllocationId --output text)"
+    echo "    aws ec2 associate-address --instance-id $INSTANCE_ID --allocation-id \"\$ALLOCATION_ID\""
+    echo "  Then set the No-IP A record to the Elastic IP printed by aws ec2 describe-addresses."
+  fi
 fi
 
 if [[ "${APP_UP:-0}" == "1" ]]; then
-  echo "  The application IS responding on the instance IP, so this is only a DNS problem."
-  echo "  Point ${PUBLIC_HOST} at ${PUBLIC_IP} in the No-IP dashboard and the site returns."
+  echo "  The readiness endpoint is healthy on the instance IP."
+elif [[ "${SITE_RESPONDING:-0}" == "1" ]]; then
+  echo "  A web server responds, but /api/health/ready is not returning 200; inspect its proxy/TLS configuration."
 else
   echo "  Nothing is answering on the instance, so the stack also needs to be (re)started."
 fi
@@ -129,6 +159,6 @@ fi
 echo
 echo "  Connect to the instance:"
 echo "    aws ssm start-session --target $INSTANCE_ID     # no SSH key needed (requires SSM agent + role)"
-echo "  Then deploy on the instance (use the PR branch until PR #79 is merged into main):"
+echo "  Then deploy on the instance:"
 echo "    curl -fsSL https://raw.githubusercontent.com/RavindraSSK/MediTrust/${DEPLOY_BRANCH}/deploy/ec2-bootstrap.sh \\"
 echo "      | BRANCH=${DEPLOY_BRANCH} bash"

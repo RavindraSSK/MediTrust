@@ -135,6 +135,11 @@ to *inspect* the account and to *connect*; run the bootstrap on the EC2 host its
    Elastic IPs, what `meditrust.ddns.net` currently resolves to, and the exact next command.
    If it finds nothing, the region is probably wrong: `export AWS_REGION=us-east-1`.
 
+   Run only commands shown in fenced code blocks. Labels such as `DNS_IP == EC2 PublicIP` and
+   values written as `<instance-id>` are explanatory placeholders, not commands to paste. The
+   status script prints the real instance ID and, when one exists, an exact command using an
+   available Elastic IP allocation.
+
 2. **Start the instance** if it is stopped:
 
    ```bash
@@ -163,6 +168,18 @@ to *inspect* the account and to *connect*; run the bootstrap on the EC2 host its
    sudo chmod 600 /etc/meditrust/ddns.env
    ```
 
+   These `systemctl` commands must be run **inside the EC2 instance after the bootstrap has
+   installed the unit files**, not in CloudShell. A `unit meditrust-ddns.timer does not exist`
+   error means the command was run on the wrong machine or bootstrap has not installed the units:
+
+   ```bash
+   sudo install -m 0755 deploy/ddns-update.sh /usr/local/bin/meditrust-ddns-update
+   sudo cp deploy/systemd/meditrust-ddns.service deploy/systemd/meditrust-ddns.timer /etc/systemd/system/
+   sudo systemctl daemon-reload
+   sudo systemctl enable --now meditrust-ddns.timer
+   sudo systemctl start meditrust-ddns.service
+   ```
+
 5. **Open the ports**: inbound TCP 80 (443 for TLS, 22 for SSH) in the instance security group.
 
 6. **Connect to the instance and deploy.** Session Manager needs no SSH key, but does need the SSM
@@ -186,15 +203,24 @@ to *inspect* the account and to *connect*; run the bootstrap on the EC2 host its
    `backend/.env` with a generated admin password and JWT secret if none exists, and starts the
    stack (pulling the GHCR images, or building them on the host when they are not published yet).
 
-   **Until PR #79 is merged, `main` cannot start** (`backend/app/password_utils.py` is missing there
-   and the API crashes on import). The bootstrap checks for this and stops with a clear message.
-   Deploy the branch instead: `BRANCH=claude/clinical-risk-platform-completion-ohnfgm`.
+   The bootstrap deploys `main` by default and stops with a clear message if a required backend
+   module is missing.
 
 7. **Verify from your laptop** once DNS has propagated (No-IP TTL is 60 s):
 
    ```bash
    curl -I http://meditrust.ddns.net/api/health/ready
    ```
+
+   If `getent hosts meditrust.ddns.net` returns no address, the hostname itself is inactive or
+   unpublished—not merely pointed at the wrong IP. Sign in to No-IP, restore/reconfirm the
+   hostname if required, set its A record to the instance's public IP, and then run the updater
+   service on the instance. No application deploy can repair an inactive DNS record without the
+   No-IP credentials.
+
+   The Docker deployment exposes HTTP on port 80. Do not use `https://meditrust.ddns.net` until
+   TLS has been configured using an ALB/CloudFront or a host reverse proxy with a certificate;
+   opening security-group port 443 alone does not provide HTTPS.
 
 ### Before the credits run out
 
