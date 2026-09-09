@@ -118,13 +118,37 @@ jobs:
         if: env.MODEL_S3_BUCKET == ''
         run: echo "MODEL_S3_BUCKET secret not set; skipping S3 publish."
 
+  preflight:
+    name: Check deployment secrets
+    runs-on: ubuntu-latest
+    outputs:
+      can_deploy: ${{ steps.check.outputs.can_deploy }}
+    steps:
+      - id: check
+        env:
+          EC2_HOST: ${{ secrets.EC2_HOST }}
+          EC2_USER: ${{ secrets.EC2_USER }}
+          EC2_SSH_KEY: ${{ secrets.EC2_SSH_KEY }}
+        run: |
+          if [[ -n "$EC2_HOST" && -n "$EC2_USER" && -n "$EC2_SSH_KEY" ]]; then
+            echo "can_deploy=true" >> "$GITHUB_OUTPUT"
+            echo "EC2 secrets are configured; the deploy job will run."
+          else
+            echo "can_deploy=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::Skipping deployment. Set the EC2_HOST, EC2_USER and EC2_SSH_KEY repository secrets to enable it."
+          fi
+
   deploy:
     name: Deploy to EC2
     runs-on: ubuntu-latest
-    needs: [build-and-push, publish-model]
+    needs: [build-and-push, publish-model, preflight]
+    if: needs.preflight.outputs.can_deploy == 'true'
     environment:
       name: production
-      url: ${{ secrets.PUBLIC_URL || 'http://meditrust.ddns.net' }}
+      # `secrets` is not an allowed context here; repository variables are.
+      url: ${{ vars.PUBLIC_URL || 'http://meditrust.ddns.net' }}
+    env:
+      PUBLIC_URL: ${{ secrets.PUBLIC_URL }}
     steps:
       - name: Run deploy script on the host
         uses: appleboy/ssh-action@v1.2.0
@@ -144,10 +168,10 @@ jobs:
           DEPLOY_MODE: ${{ secrets.DEPLOY_MODE }}
           APP_DIR: ${{ secrets.EC2_APP_DIR }}
       - name: Post-deploy smoke check
-        if: ${{ secrets.PUBLIC_URL != '' }}
+        if: env.PUBLIC_URL != ''
         run: |
           for i in $(seq 1 12); do
-            if curl -fsS "${{ secrets.PUBLIC_URL }}/api/health/ready"; then echo; echo "ready"; exit 0; fi
+            if curl -fsS "${PUBLIC_URL}/api/health/ready"; then echo; echo "ready"; exit 0; fi
             sleep 10
           done
           echo "service did not become ready"; exit 1
