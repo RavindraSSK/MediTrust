@@ -1,592 +1,449 @@
+"""
+Model registry, inference and patient-level SHAP explanations.
+
+Artifacts (``model.joblib``, ``preprocessor.joblib``, ``model_metadata.json``,
+``global_feature_importance.json``) are produced by ``ml/src/train_models.py``
+and loaded from ``MODEL_DIR`` (default ``ml/models``). When ``MODEL_S3_URI`` is
+set the artifacts are first synchronised from S3 so EC2 instances always run
+the model that CI published.
+"""
+
+from __future__ import annotations
+
+import json
+import logging
+import threading
+import time
+from dataclasses import dataclass
 from pathlib import Path
+from urllib.parse import urlparse
+
 import joblib
-import os
-import pandas as pd
 import numpy as np
-import shap
-from dotenv import load_dotenv
-from google import genai
-from google.genai import types
+import pandas as pd
+
+from .clinical_encoding import ENCODING_VERSION, FEATURE_ORDER, feature_label, validate_record
+from .config import settings
+from .observability import MODEL_INFO, MODEL_LOADED
+
+logger = logging.getLogger(__name__)
+
+REQUIRED_ARTIFACTS = ("model.joblib", "preprocessor.joblib")
+OPTIONAL_ARTIFACTS = ("model_metadata.json", "global_feature_importance.json", "roc_curve.json", "model_results.csv")
+BACKGROUND_SAMPLE_SIZE = 100
+TOP_FEATURES = 6
 
 
-BASE_DIR = Path(__file__).resolve().parents[2]
-ENV_PATH = BASE_DIR / "backend" / ".env"
-load_dotenv()
-load_dotenv(dotenv_path=ENV_PATH)
-
-MODEL_PATH_CANDIDATES = [
-    BASE_DIR / "ml" / "models" / "model.joblib",
-    BASE_DIR / "backend" / "ml" / "models" / "model.joblib",
-]
-PREPROCESSOR_PATH_CANDIDATES = [
-    BASE_DIR / "ml" / "models" / "preprocessor.joblib",
-    BASE_DIR / "backend" / "ml" / "models" / "preprocessor.joblib",
-]
-BACKGROUND_DATA_PATH_CANDIDATES = [
-    BASE_DIR / "ml" / "data" / "processed" / "heart_disease_clean.csv",
-    BASE_DIR / "backend" / "ml" / "data" / "processed" / "heart_disease_clean.csv",
-]
+class ModelNotLoadedError(RuntimeError):
+    pass
 
 
-RAW_FEATURE_ORDER = [
-    "age",
-    "sex",
-    "cp",
-    "trestbps",
-    "chol",
-    "fbs",
-    "restecg",
-    "thalach",
-    "exang",
-    "oldpeak",
-    "slope",
-    "ca",
-    "thal",
-]
-
-_model = None
-_preprocessor = None
-_explainer = None
-_background_dense = None
-GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
-GEMINI_TIMEOUT_MS = int(os.getenv("GEMINI_TIMEOUT_MS", "10000"))
-GEMINI_SYSTEM_INSTRUCTION = (
-    "You are a cardiologist's AI assistant. Summarize heart risk scores in under 50 words. "
-    'Translate "ca" to "vessel health", "cp" to "chest pain type", and "thal" to "stress test results". '
-    "focus on why the score is high or low."
-)
-
-CLINICAL_FEATURE_LABELS = {
-    "age": "age",
-    "chol": "total cholesterol",
-    "trestbps": "resting blood pressure",
-    "oldpeak": "exercise-induced ST depression",
-    "exang": "exercise-induced angina",
-    "thalach": "maximum heart rate achieved",
-    "ca": "major vessel involvement",
-    "thal": "thallium stress test result",
-    "cp": "chest pain pattern",
-    "restecg": "resting ECG findings",
-    "fbs": "fasting blood sugar",
-    "slope": "ST-segment slope",
-    "sex": "sex",
-}
-
-GEMINI_FEATURE_LABELS = {
-    "age": "age",
-    "sex": "sex",
-    "cp": "chest pain type",
-    "trestbps": "resting blood pressure",
-    "chol": "cholesterol",
-    "fbs": "fasting blood sugar",
-    "restecg": "resting ECG result",
-    "thalach": "maximum heart rate",
-    "exang": "exercise-induced angina",
-    "oldpeak": "ST depression",
-    "slope": "ST-segment slope",
-    "ca": "major vessel involvement",
-    "thal": "thallium stress test result",
-}
+class InvalidClinicalInputError(ValueError):
+    def __init__(self, errors: list[str]):
+        super().__init__("; ".join(errors))
+        self.errors = errors
 
 
-def _resolve_existing_path(candidates: list[Path], label: str) -> Path:
-    for path in candidates:
-        if path.exists():
-            return path
+@dataclass
+class LoadedModel:
+    model: object
+    preprocessor: object
+    metadata: dict
+    feature_names: list[str]
+    background: np.ndarray | None
+    explainer: object | None
+    global_importance: dict | None
+    loaded_at: float
+    source: str
 
-    searched = ", ".join(str(path) for path in candidates)
-    raise FileNotFoundError(f"{label} not found. Looked in: {searched}")
+    @property
+    def name(self) -> str:
+        return str(self.metadata.get("model_name") or type(self.model).__name__)
 
-
-def _load_background_frame() -> pd.DataFrame:
-    """
-    Load a small representative background dataset for SHAP.
-    This should be the cleaned training-style feature table.
-    """
-    background_path = None
-    for candidate in BACKGROUND_DATA_PATH_CANDIDATES:
-        if candidate.exists():
-            background_path = candidate
-            break
-
-    if background_path is None:
-        raise FileNotFoundError(
-            "Background data not found. "
-            f"Looked in: {', '.join(str(path) for path in BACKGROUND_DATA_PATH_CANDIDATES)}"
-        )
-
-    df = pd.read_csv(background_path)
-
-    # Keep only model input columns
-    missing = [col for col in RAW_FEATURE_ORDER if col not in df.columns]
-    if missing:
-        raise ValueError(
-            f"Background data is missing required columns: {missing}"
-        )
-
-    df = df[RAW_FEATURE_ORDER].copy()
-
-    # Use a small sample for SHAP background
-    if len(df) > 100:
-        df = df.sample(n=100, random_state=42)
-
-    return df
+    @property
+    def version(self) -> str:
+        return str(self.metadata.get("model_version") or "unversioned")
 
 
-def _to_dense(matrix):
+def _to_dense(matrix) -> np.ndarray:
     if hasattr(matrix, "toarray"):
         return matrix.toarray()
-    return np.asarray(matrix)
+    return np.asarray(matrix, dtype=float)
 
 
-def _get_feature_names(preprocessor) -> list[str]:
-    if hasattr(preprocessor, "get_feature_names_out"):
-        return list(preprocessor.get_feature_names_out())
-    return RAW_FEATURE_ORDER.copy()
+def _positive_probability(model):
+    def predict(X):
+        return np.asarray(model.predict_proba(X))[:, 1]
+
+    return predict
 
 
-def _load_artifacts():
-    global _model, _preprocessor, _explainer, _background_dense
+def _is_tree_model(model) -> bool:
+    return hasattr(model, "estimators_") or hasattr(model, "get_booster")
 
-    if _preprocessor is None:
-        _preprocessor = joblib.load(
-            _resolve_existing_path(PREPROCESSOR_PATH_CANDIDATES, "Preprocessor")
-        )
 
-    if _model is None:
-        _model = joblib.load(
-            _resolve_existing_path(MODEL_PATH_CANDIDATES, "Model")
-        )
-        if not hasattr(_model, "multi_class"):
-            _model.multi_class = "auto"
+def _build_explainer(model, background: np.ndarray | None, feature_names: list[str]):
+    if background is None:
+        return None
+    import shap
 
-    if _background_dense is None and _explainer is None:
+    if _is_tree_model(model):
         try:
-            background_df = _load_background_frame()
-            background_transformed = _preprocessor.transform(background_df)
-            _background_dense = _to_dense(background_transformed)
-        except Exception:
-            _background_dense = None
-
-    if _explainer is None and _background_dense is not None:
-        # Preferred for tree models: probability-space explanation
-        try:
-            _explainer = shap.TreeExplainer(
-                _model,
-                data=_background_dense,
-                model_output="probability"
+            return shap.TreeExplainer(
+                model, data=background, model_output="probability", feature_perturbation="interventional"
             )
-        except Exception:
-            # Generic explainer fallback with proper background/masker
-            _explainer = shap.Explainer(
-                _model.predict_proba,
-                _background_dense,
-                feature_names=_get_feature_names(_preprocessor)
-            )
-
-    return _model, _preprocessor, _explainer, _background_dense
+        except Exception as exc:  # noqa: BLE001
+            logger.info("TreeExplainer unavailable (%s); using permutation explainer", exc)
+    return shap.Explainer(_positive_probability(model), background, feature_names=feature_names)
 
 
-def _make_dataframe(payload: dict) -> pd.DataFrame:
-    row = {feature: payload[feature] for feature in RAW_FEATURE_ORDER}
-    return pd.DataFrame([row], columns=RAW_FEATURE_ORDER)
-
-
-def predict_probability(payload: dict) -> float:
-    model, preprocessor, _, _ = _load_artifacts()
-    df = _make_dataframe(payload)
-    X_t = preprocessor.transform(df)
-    prob = model.predict_proba(X_t)[:, 1][0]
-    return float(prob)
-
-
-def _normalize_feature_name(name: str) -> str:
-    cleaned = name
-
-    if "__" in cleaned:
-        cleaned = cleaned.split("__", 1)[1]
-
-    for raw in RAW_FEATURE_ORDER:
-        if cleaned == raw:
-            return raw
-        if cleaned.startswith(raw + "_"):
-            return raw
-
-    return cleaned
-
-
-def _get_clinical_feature_label(feature: str) -> str:
-    return CLINICAL_FEATURE_LABELS.get(feature, feature.replace("_", " "))
-
-
-def _get_gemini_feature_label(feature: str) -> str:
-    return GEMINI_FEATURE_LABELS.get(feature, feature.replace("_", " "))
-
-
-def _get_gemini_client(api_key: str) -> genai.Client:
-    return genai.Client(
-        api_key=api_key,
-        http_options=types.HttpOptions(
-            timeout=GEMINI_TIMEOUT_MS,
-            clientArgs={"trust_env": False},
-            asyncClientArgs={"trust_env": False},
-        ),
-    )
-
-
-def _coerce_float(value) -> float | None:
-    try:
-        return float(value)
-    except (TypeError, ValueError):
-        return None
-
-
-def _normalize_risk_percent(risk_percent: float) -> float | None:
-    normalized = _coerce_float(risk_percent)
-    if normalized is None:
-        return None
-    if 0.0 <= normalized <= 1.0:
-        normalized *= 100.0
-    return max(0.0, min(normalized, 100.0))
-
-
-def _extract_shap_pairs(shap_values: dict) -> tuple[list[tuple[str, float]], list[tuple[str, float]]]:
-    if not isinstance(shap_values, dict):
-        return [], []
-
-    pairs = []
-    for feature, value in shap_values.items():
-        impact = value.get("impact") if isinstance(value, dict) else value
-        numeric_impact = _coerce_float(impact)
-        if numeric_impact is None:
-            continue
-        pairs.append((str(feature), numeric_impact))
-
-    positive = [item for item in pairs if item[1] > 0]
-    negative = [item for item in pairs if item[1] < 0]
-    positive.sort(key=lambda item: item[1], reverse=True)
-    negative.sort(key=lambda item: item[1])
-    return positive[:2], negative[:2]
-
-
-def _format_feature_group(features: list[tuple[str, float]], empty_text: str) -> str:
-    if not features:
-        return empty_text
-    labels = [_get_gemini_feature_label(feature) for feature, _ in features]
-    return ", ".join(labels)
-
-
-def _build_clinical_summary_prompt(
-    risk_percent: float,
-    positive_features: list[tuple[str, float]],
-    negative_features: list[tuple[str, float]],
-) -> str:
-    drivers_text = _format_feature_group(positive_features, "no clear risk drivers identified")
-    protective_text = _format_feature_group(negative_features, "no clear protective factors identified")
-
-    return (
-        f"Heart risk score: {int(round(risk_percent))}%.\n"
-        f"Risk Drivers: {drivers_text}.\n"
-        f"Protective Factors: {protective_text}.\n"
-        "Write exactly 2 sentences under 50 words total. "
-        "Sentence 1 should explain what is pushing risk higher. "
-        "Sentence 2 should explain what is lowering risk and end with a short final clinical observation. "
-        "Use simple clinical language only. Do not mention AI, SHAP, patient names, or raw values."
-    )
-
-
-def get_clinical_summary(risk_percent: float, shap_values: dict) -> str | None:
-    load_dotenv(dotenv_path=ENV_PATH)
-
-    api_key = (os.getenv("GEMINI_API_KEY") or "").strip()
-    normalized_risk = _normalize_risk_percent(risk_percent)
-    if not api_key or normalized_risk is None or not isinstance(shap_values, dict):
-        return None
-
-    positive_features, negative_features = _extract_shap_pairs(shap_values)
-    if not positive_features and not negative_features:
-        return None
-
-    prompt = _build_clinical_summary_prompt(normalized_risk, positive_features, negative_features)
-
-    try:
-        client = _get_gemini_client(api_key)
-        response = client.models.generate_content(
-            model=GEMINI_MODEL,
-            contents=prompt,
-            config=types.GenerateContentConfig(
-                system_instruction=GEMINI_SYSTEM_INSTRUCTION,
-                temperature=0.2,
-                max_output_tokens=80,
-            ),
-        )
-        text = getattr(response, "text", None)
-        return text.strip() if text else None
-    except Exception as e:
-        print("Gemini error:", e)
-        return None
-
-
-def _build_gemini_prompt(
-    top_features: list[dict],
-    risk_level: str,
-    risk_probability: float | None = None,
-    triage_recommendation: str | None = None,
-    explanation_summary: str | None = None,
-) -> str:
-    percent_text = "N/A"
-    normalized_probability = _coerce_float(risk_probability)
-    if normalized_probability is not None:
-        if 0.0 <= normalized_probability <= 1.0:
-            normalized_probability *= 100.0
-        percent_text = f"{int(round(max(0.0, min(normalized_probability, 100.0))))}%"
-
-    feature_descriptions = []
-    for item in top_features[:3]:
-        if not isinstance(item, dict) or not item.get("feature"):
-            continue
-
-        label = _get_gemini_feature_label(str(item["feature"]))
-        direction = str(item.get("direction") or "affects risk").strip().lower()
-        if direction == "increases risk":
-            direction_text = "increased estimated risk"
-        elif direction == "decreases risk":
-            direction_text = "lowered estimated risk"
+def _extract_shap_array(shap_output) -> np.ndarray:
+    values = np.asarray(getattr(shap_output, "values", shap_output))
+    if values.ndim == 3:
+        if values.shape[-1] == 2:
+            values = values[0, :, 1]
+        elif values.shape[1] == 2:
+            values = values[0, 1, :]
         else:
-            direction_text = direction
-
-        feature_descriptions.append(f"{label} ({direction_text})")
-
-    features_text = ", ".join(feature_descriptions) if feature_descriptions else "No major contributing factors available"
-    recommendation_text = (triage_recommendation or "No triage recommendation provided").strip()
-    explanation_text = (explanation_summary or "No explanation summary provided").strip()
-
-    return (
-        "Generate a 2 sentence clinical summary for this cardiovascular risk assessment. "
-        "Use simple professional language. Do not mention SHAP or AI. "
-        "Do not give diagnosis. Do not add medication advice.\n"
-        f"Risk level: {risk_level}.\n"
-        f"Risk probability: {percent_text}.\n"
-        f"Triage recommendation: {recommendation_text}.\n"
-        f"Clinical explanation: {explanation_text}.\n"
-        f"Key contributing factors: {features_text}."
-    )
-
-def generate_gemini_summary(
-    top_features: list[dict],
-    risk_level: str,
-    risk_probability: float | None = None,
-    triage_recommendation: str | None = None,
-    explanation_summary: str | None = None,
-) -> str | None:
-    if not top_features:
-        return None
-
-    load_dotenv()
-    load_dotenv(dotenv_path=ENV_PATH)
-    api_key = os.getenv("GEMINI_API_KEY")
-
-    print("Gemini key loaded:", bool(api_key))
-    if not api_key:
-        print("Gemini skipped: GEMINI_API_KEY not found")
-        return None
-
-    prompt = _build_gemini_prompt(
-        top_features=top_features,
-        risk_level=risk_level,
-        risk_probability=risk_probability,
-        triage_recommendation=triage_recommendation,
-        explanation_summary=explanation_summary,
-    )
-    proxy_keys = [
-        "HTTP_PROXY",
-        "HTTPS_PROXY",
-        "ALL_PROXY",
-        "http_proxy",
-        "https_proxy",
-        "all_proxy",
-    ]
-    broken_proxy_values = {"http://127.0.0.1:9", "https://127.0.0.1:9"}
-    removed_proxies = {}
-
-    try:
-        for key in proxy_keys:
-            value = os.environ.get(key)
-            if value in broken_proxy_values:
-                removed_proxies[key] = value
-                os.environ.pop(key, None)
-
-        client = genai.Client(api_key=api_key)
-        response = client.models.generate_content(
-            model="gemini-2.5-flash",
-            contents=prompt
-        )
-        summary_text = response.text.strip() if getattr(response, "text", None) else None
-        print("Gemini summary generated:", bool(summary_text))
-        return summary_text
-    except Exception as e:
-        print("Gemini error:", repr(e))
-        return None
-    finally:
-        for key, value in removed_proxies.items():
-            os.environ[key] = value
-
-
-def _extract_shap_array(shap_output):
-    """
-    Normalize SHAP outputs into a 1D contribution vector for class 1 probability.
-    """
-    values = getattr(shap_output, "values", shap_output)
-    arr = np.asarray(values)
-
-    if arr.ndim == 3:
-        # Expected cases:
-        # (n_samples, n_features, n_classes)
-        # or (n_samples, n_classes, n_features)
-        if arr.shape[-1] == 2:
-            arr = arr[0, :, 1]
-        elif arr.shape[1] == 2:
-            arr = arr[0, 1, :]
-        else:
-            arr = arr[0].reshape(-1)
-    elif arr.ndim == 2:
-        arr = arr[0]
-    elif arr.ndim == 1:
-        arr = arr
+            values = values[0].reshape(-1)
+    elif values.ndim == 2:
+        values = values[0]
     else:
-        arr = arr.reshape(-1)
+        values = values.reshape(-1)
+    return np.asarray(values, dtype=float)
 
-    return np.asarray(arr, dtype=float)
 
-
-def _get_base_value(shap_output):
-    """
-    Get a base value compatible with class 1 probability explanation.
-    """
-    base_values = getattr(shap_output, "base_values", None)
-
-    if base_values is None:
+def _extract_base_value(shap_output) -> float:
+    base = getattr(shap_output, "base_values", None)
+    if base is None:
         return 0.0
-
-    arr = np.asarray(base_values)
-
+    arr = np.asarray(base, dtype=float)
     if arr.ndim == 0:
         return float(arr)
-
     if arr.ndim == 1:
-        if len(arr) == 2:
-            return float(arr[1])
-        return float(arr[0])
-
+        return float(arr[1]) if arr.shape[0] == 2 else float(arr[0])
     if arr.ndim == 2:
-        if arr.shape[-1] == 2:
-            return float(arr[0, 1])
-        return float(arr[0, 0])
-
+        return float(arr[0, 1]) if arr.shape[-1] == 2 else float(arr[0, 0])
     return float(arr.reshape(-1)[0])
 
 
-def _aggregate_shap_values(feature_names: list[str], shap_values: np.ndarray, payload: dict):
-    """
-    Aggregate transformed-feature SHAP values back to raw feature names.
-    Example:
-      num__chol -> chol
-      cat__cp_3 -> cp
-    """
-    grouped = {}
+def raw_feature_for_column(column: str) -> str:
+    cleaned = column.split("__", 1)[1] if "__" in column else column
+    for raw in FEATURE_ORDER:
+        if cleaned == raw or cleaned.startswith(raw + "_"):
+            return raw
+    return cleaned
 
+
+def aggregate_contributions(feature_names: list[str], contributions: np.ndarray, payload: dict) -> list[dict]:
+    grouped: dict[str, float] = {}
     for idx, name in enumerate(feature_names):
-        base_name = _normalize_feature_name(name)
-        grouped[base_name] = grouped.get(base_name, 0.0) + float(shap_values[idx])
+        raw = raw_feature_for_column(name)
+        grouped[raw] = grouped.get(raw, 0.0) + float(contributions[idx])
 
     explanations = []
     for feature, impact in grouped.items():
         if feature not in payload:
             continue
-
         explanations.append(
             {
                 "feature": feature,
+                "label": feature_label(feature),
                 "value": float(payload[feature]),
-                "impact": float(impact),  # do not round here
+                "impact": float(impact),
                 "direction": "increases risk" if impact >= 0 else "decreases risk",
             }
         )
-
     explanations.sort(key=lambda item: abs(item["impact"]), reverse=True)
     return explanations
 
 
-def _aggregate_linear_contributions(model, preprocessor, payload: dict):
-    """
-    Fallback explanation path when SHAP background data is unavailable.
-    For linear models, use transformed-feature coefficient contributions.
-    """
-    if not hasattr(model, "coef_"):
-        return []
-
-    df = _make_dataframe(payload)
-    X_t = preprocessor.transform(df)
-    X_dense = _to_dense(X_t)
-    feature_names = _get_feature_names(preprocessor)
-    contributions = X_dense[0] * np.asarray(model.coef_[0], dtype=float)
-    return _aggregate_shap_values(feature_names, contributions, payload)
-
-
-def explain_prediction(payload: dict, risk_level: str):
-    """
-    Returns:
-      top_features: top SHAP-ranked features
-      all_features: all SHAP-ranked features
-      base_value: base probability
-      summary: summary sentence
-    """
-    model, preprocessor, explainer, _ = _load_artifacts()
-
-    df = _make_dataframe(payload)
-    X_t = preprocessor.transform(df)
-    X_dense = _to_dense(X_t)
-    feature_names = _get_feature_names(preprocessor)
-
-    if explainer is not None:
-        shap_output = explainer(X_dense)
-        shap_values = _extract_shap_array(shap_output)
-        base_value = _get_base_value(shap_output)
-        all_features = _aggregate_shap_values(feature_names, shap_values, payload)
-    else:
-        base_value = float(getattr(model, "intercept_", [0.0])[0])
-        all_features = _aggregate_linear_contributions(model, preprocessor, payload)
-
-    top_features = all_features[:6]
-
+def build_explanation_summary(top_features: list[dict], risk_level: str) -> str:
     if not top_features:
-        summary = (
+        return (
             "The model generated a prediction, but detailed SHAP-based feature contributions "
             "were not available for this request."
         )
-        return [], [], float(base_value), summary
-
-    increasing = [item["feature"] for item in top_features if item["direction"] == "increases risk"]
-    decreasing = [item["feature"] for item in top_features if item["direction"] == "decreases risk"]
-
+    increasing = [item["label"].lower() for item in top_features if item["direction"] == "increases risk"]
+    decreasing = [item["label"].lower() for item in top_features if item["direction"] == "decreases risk"]
+    level = risk_level.lower()
     if increasing and decreasing:
-        summary = (
-            f"The SHAP explanation indicates that {', '.join(increasing)} are the strongest "
-            f"factors increasing the estimated cardiovascular risk, while "
-            f"{', '.join(decreasing)} offset the prediction to some extent. "
-            f"Overall, this pattern is consistent with a {risk_level.lower()} predicted risk profile."
+        return (
+            f"SHAP attribution indicates that {', '.join(increasing)} are the strongest factors increasing "
+            f"the estimated probability of coronary artery disease, while {', '.join(decreasing)} offset the "
+            f"prediction to some extent. Overall this pattern is consistent with a {level} predicted risk profile."
         )
-    elif increasing:
-        summary = (
-            f"The SHAP explanation indicates that {', '.join(increasing)} are the strongest "
-            f"factors increasing the estimated cardiovascular risk. "
-            f"Overall, this pattern is consistent with a {risk_level.lower()} predicted risk profile."
+    if increasing:
+        return (
+            f"SHAP attribution indicates that {', '.join(increasing)} are the strongest factors increasing "
+            f"the estimated probability of coronary artery disease. Overall this pattern is consistent with a "
+            f"{level} predicted risk profile."
         )
-    else:
-        summary = (
-            f"The SHAP explanation indicates that {', '.join(decreasing)} are the strongest "
-            f"factors supporting a lower estimated cardiovascular risk. "
-            f"Overall, this pattern is consistent with a {risk_level.lower()} predicted risk profile."
-        )
+    return (
+        f"SHAP attribution indicates that {', '.join(decreasing)} are the strongest factors supporting a lower "
+        f"estimated probability of coronary artery disease. Overall this pattern is consistent with a {level} "
+        "predicted risk profile."
+    )
 
-    return top_features, all_features, float(base_value), summary
+
+class ModelService:
+    def __init__(
+        self,
+        model_dir: Path | None = None,
+        background_path: Path | None = None,
+        s3_uri: str | None = None,
+    ):
+        self.model_dir = Path(model_dir or settings.model_dir)
+        self.background_path = Path(background_path or settings.background_data_path)
+        self.s3_uri = s3_uri if s3_uri is not None else settings.model_s3_uri
+        self._loaded: LoadedModel | None = None
+        self._lock = threading.Lock()
+        self.last_error: str | None = None
+
+    # ------------------------------------------------------------------ loading
+    @property
+    def is_loaded(self) -> bool:
+        return self._loaded is not None
+
+    def sync_from_s3(self) -> bool:
+        """Download artifacts from ``MODEL_S3_URI`` (s3://bucket/prefix). Never raises."""
+        if not self.s3_uri:
+            return False
+        try:
+            import boto3
+        except ImportError:
+            logger.warning("MODEL_S3_URI is set but boto3 is not installed; using local artifacts")
+            return False
+
+        parsed = urlparse(self.s3_uri)
+        bucket = parsed.netloc
+        prefix = parsed.path.strip("/")
+        if parsed.scheme != "s3" or not bucket:
+            logger.warning("MODEL_S3_URI must look like s3://bucket/prefix (got %r)", self.s3_uri)
+            return False
+
+        client = boto3.client("s3", region_name=settings.aws_region or None)
+        self.model_dir.mkdir(parents=True, exist_ok=True)
+        downloaded = 0
+        for name in REQUIRED_ARTIFACTS + OPTIONAL_ARTIFACTS:
+            key = f"{prefix}/{name}" if prefix else name
+            target = self.model_dir / name
+            try:
+                client.download_file(bucket, key, str(target))
+                downloaded += 1
+            except Exception as exc:  # noqa: BLE001
+                if name in REQUIRED_ARTIFACTS:
+                    logger.error("Failed to download required artifact %s from s3://%s/%s: %s", name, bucket, key, exc)
+                    return False
+                logger.info("Optional artifact %s not found in S3 (%s)", name, exc)
+        logger.info("Synchronised %d model artifacts from %s", downloaded, self.s3_uri)
+        return downloaded > 0
+
+    def _load_background(self) -> pd.DataFrame | None:
+        if not self.background_path.exists():
+            logger.warning("SHAP background data not found at %s", self.background_path)
+            return None
+        df = pd.read_csv(self.background_path, encoding="utf-8-sig")
+        missing = [c for c in FEATURE_ORDER if c not in df.columns]
+        if missing:
+            logger.warning("Background data is missing columns %s", missing)
+            return None
+        df = df[FEATURE_ORDER].copy()
+        if len(df) > BACKGROUND_SAMPLE_SIZE:
+            df = df.sample(n=BACKGROUND_SAMPLE_SIZE, random_state=42)
+        return df
+
+    def load(self, force: bool = False) -> LoadedModel:
+        with self._lock:
+            if self._loaded is not None and not force:
+                return self._loaded
+
+            source = "local"
+            if self.sync_from_s3():
+                source = self.s3_uri
+
+            model_path = self.model_dir / "model.joblib"
+            preprocessor_path = self.model_dir / "preprocessor.joblib"
+            if not model_path.exists() or not preprocessor_path.exists():
+                self.last_error = f"Model artifacts not found in {self.model_dir}"
+                MODEL_LOADED.set(0)
+                raise ModelNotLoadedError(self.last_error)
+
+            try:
+                model = joblib.load(model_path)
+                preprocessor = joblib.load(preprocessor_path)
+                if not hasattr(model, "multi_class"):  # older LogisticRegression pickles
+                    try:
+                        model.multi_class = "auto"
+                    except Exception:  # noqa: BLE001
+                        pass
+
+                metadata: dict = {}
+                metadata_path = self.model_dir / "model_metadata.json"
+                if metadata_path.exists():
+                    metadata = json.loads(metadata_path.read_text())
+
+                global_importance = None
+                importance_path = self.model_dir / "global_feature_importance.json"
+                if importance_path.exists():
+                    global_importance = json.loads(importance_path.read_text())
+                elif metadata.get("global_feature_importance"):
+                    global_importance = metadata["global_feature_importance"]
+
+                if hasattr(preprocessor, "get_feature_names_out"):
+                    feature_names = list(preprocessor.get_feature_names_out())
+                else:
+                    feature_names = list(FEATURE_ORDER)
+
+                background = None
+                background_df = self._load_background()
+                if background_df is not None:
+                    background = _to_dense(preprocessor.transform(background_df))
+
+                explainer = None
+                try:
+                    explainer = _build_explainer(model, background, feature_names)
+                except Exception as exc:  # noqa: BLE001
+                    logger.warning("Could not build SHAP explainer: %s", exc)
+
+                loaded = LoadedModel(
+                    model=model,
+                    preprocessor=preprocessor,
+                    metadata=metadata,
+                    feature_names=feature_names,
+                    background=background,
+                    explainer=explainer,
+                    global_importance=global_importance,
+                    loaded_at=time.time(),
+                    source=source,
+                )
+            except ModelNotLoadedError:
+                raise
+            except Exception as exc:  # noqa: BLE001
+                self.last_error = f"Failed to load model: {exc}"
+                MODEL_LOADED.set(0)
+                logger.exception("Failed to load model artifacts")
+                raise ModelNotLoadedError(self.last_error) from exc
+
+            encoding = loaded.metadata.get("encoding_version")
+            if encoding and encoding != ENCODING_VERSION:
+                logger.warning(
+                    "Model encoding %s differs from API encoding %s; retrain with ml/src/train_models.py",
+                    encoding,
+                    ENCODING_VERSION,
+                )
+
+            self._loaded = loaded
+            self.last_error = None
+            MODEL_LOADED.set(1)
+            MODEL_INFO.labels(loaded.name, loaded.version).set(1)
+            logger.info(
+                "Loaded %s (version %s) from %s with %d transformed features; explainer=%s",
+                loaded.name,
+                loaded.version,
+                source,
+                len(feature_names),
+                type(explainer).__name__ if explainer else "none",
+            )
+            return loaded
+
+    def ensure_loaded(self) -> LoadedModel:
+        if self._loaded is None:
+            return self.load()
+        return self._loaded
+
+    # ---------------------------------------------------------------- inference
+    @staticmethod
+    def _frame(payload: dict) -> pd.DataFrame:
+        row = {feature: payload[feature] for feature in FEATURE_ORDER}
+        return pd.DataFrame([row], columns=FEATURE_ORDER)
+
+    @staticmethod
+    def validate(payload: dict) -> dict:
+        errors = validate_record(payload)
+        if errors:
+            raise InvalidClinicalInputError(errors)
+        cleaned = {}
+        for feature in FEATURE_ORDER:
+            value = payload[feature]
+            cleaned[feature] = (
+                float(value) if feature in ("age", "trestbps", "chol", "thalach", "oldpeak") else int(value)
+            )
+        return cleaned
+
+    def predict_probability(self, payload: dict) -> float:
+        loaded = self.ensure_loaded()
+        cleaned = self.validate(payload)
+        X_t = loaded.preprocessor.transform(self._frame(cleaned))
+        prob = float(np.asarray(loaded.model.predict_proba(X_t))[:, 1][0])
+        return min(max(prob, 0.0), 1.0)
+
+    def explain(self, payload: dict, risk_level: str) -> tuple[list[dict], list[dict], float, str]:
+        loaded = self.ensure_loaded()
+        cleaned = self.validate(payload)
+        X_dense = _to_dense(loaded.preprocessor.transform(self._frame(cleaned)))
+
+        if loaded.explainer is not None:
+            shap_output = loaded.explainer(X_dense)
+            contributions = _extract_shap_array(shap_output)
+            base_value = _extract_base_value(shap_output)
+            all_features = aggregate_contributions(loaded.feature_names, contributions, cleaned)
+        elif hasattr(loaded.model, "coef_"):
+            coef = np.asarray(loaded.model.coef_, dtype=float).reshape(-1)
+            contributions = X_dense[0] * coef
+            base_value = float(np.asarray(getattr(loaded.model, "intercept_", [0.0])).reshape(-1)[0])
+            all_features = aggregate_contributions(loaded.feature_names, contributions, cleaned)
+        else:
+            all_features, base_value = [], 0.0
+
+        top_features = all_features[:TOP_FEATURES]
+        summary = build_explanation_summary(top_features, risk_level)
+        return top_features, all_features, float(base_value), summary
+
+    # ------------------------------------------------------------------- info
+    def info(self) -> dict:
+        try:
+            loaded = self.ensure_loaded()
+        except ModelNotLoadedError as exc:
+            return {"status": "unavailable", "error": str(exc)}
+
+        meta = loaded.metadata
+        return {
+            "status": "ready",
+            "model_name": loaded.name,
+            "model_class": meta.get("model_class") or type(loaded.model).__name__,
+            "model_version": loaded.version,
+            "trained_at": meta.get("trained_at"),
+            "encoding_version": meta.get("encoding_version", ENCODING_VERSION),
+            "label_definition": meta.get("label_definition"),
+            "positive_class_meaning": meta.get("positive_class_meaning"),
+            "features": meta.get("features", FEATURE_ORDER),
+            "selection_criterion": meta.get("selection_criterion"),
+            "cross_validation": meta.get("cross_validation"),
+            "test_metrics": meta.get("test_metrics"),
+            "thresholds": meta.get("thresholds"),
+            "risk_bands": meta.get("risk_bands"),
+            "leaderboard": meta.get("leaderboard"),
+            "global_feature_importance": loaded.global_importance,
+            "library_versions": meta.get("library_versions"),
+            "dataset": meta.get("dataset"),
+            "explainer": type(loaded.explainer).__name__ if loaded.explainer else None,
+            "artifact_source": loaded.source,
+            "loaded_at": loaded.loaded_at,
+        }
+
+    @property
+    def model_version(self) -> str:
+        return self._loaded.version if self._loaded else "unloaded"
+
+
+model_service = ModelService()
+
+
+# Backwards-compatible module-level helpers -----------------------------------
+def predict_probability(payload: dict) -> float:
+    return model_service.predict_probability(payload)
+
+
+def explain_prediction(payload: dict, risk_level: str):
+    return model_service.explain(payload, risk_level)

@@ -1,0 +1,16 @@
+[tool.ruff]
+line-length = 120
+target-version = "py311"
+extend-exclude = ["frontend", "docs", "screenshots", "ml/data", "ml/models", "ml/reports"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP"]
+ignore = ["E501", "B008", "UP007", "UP035", "UP006"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["app"]
+
+[tool.pytest.ini_options]
+testpaths = ["backend/tests", "ml/tests"]
+addopts = "-q"
+filterwarnings = ["ignore::DeprecationWarning", "ignore::UserWarning"]

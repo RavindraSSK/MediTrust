@@ -1,0 +1,10 @@
+[Unit]
+Description=Keep the MediTrust DDNS record in sync (boot + every 15 minutes)
+
+[Timer]
+OnBootSec=1min
+OnUnitActiveSec=15min
+Unit=meditrust-ddns.service
+
+[Install]
+WantedBy=timers.target

@@ -1,0 +1,8 @@
+[Unit]
+Description=Update the MediTrust DDNS record with this instance's public IP
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/meditrust-ddns-update

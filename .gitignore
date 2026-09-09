@@ -20,6 +20,22 @@ Thumbs.db
 # Logs
 *.log
 
-# ML artifacts
-ml/models/*.joblib
-ml/data/processed/*.csv
+# ML working files (trained artifacts and the canonical dataset ARE committed)
+ml/data/processed/X_*_raw.csv
+ml/data/processed/y_*.csv
+ml/data/processed/dataset_summary.json
+
+# Secrets / local state
+backend/.jwt_secret
+*.jwt_secret
+
+# Frontend build
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/
+
+# Tooling
+.pytest_cache/
+.ruff_cache/
+htmlcov/
+.coverage
