@@ -7,6 +7,7 @@ password that reaches ``passlib`` therefore goes through
 ``validate_password_for_bcrypt`` first so callers get a clear error message
 instead of a 500.
 """
+
 from __future__ import annotations
 
 from passlib.context import CryptContext
