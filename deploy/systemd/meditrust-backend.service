@@ -1,0 +1,22 @@
+# systemd unit for the "native" EC2 deployment.
+# Install: sudo cp deploy/systemd/meditrust-backend.service /etc/systemd/system/
+#          sudo systemctl daemon-reload && sudo systemctl enable --now meditrust-backend
+[Unit]
+Description=MediTrust API (gunicorn + uvicorn workers)
+After=network.target
+
+[Service]
+Type=simple
+User=ubuntu
+Group=ubuntu
+WorkingDirectory=/opt/meditrust/backend
+EnvironmentFile=/opt/meditrust/backend/.env
+Environment=APP_ENV=production
+ExecStart=/opt/meditrust/.venv/bin/gunicorn -c gunicorn.conf.py app.main:app
+Restart=always
+RestartSec=5
+KillSignal=SIGTERM
+TimeoutStopSec=30
+
+[Install]
+WantedBy=multi-user.target

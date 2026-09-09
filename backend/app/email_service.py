@@ -5,7 +5,6 @@ import ssl
 from email.message import EmailMessage
 from email.utils import formataddr
 
-
 logger = logging.getLogger(__name__)
 
 EMAIL_SENT = "email"

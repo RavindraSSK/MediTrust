@@ -1,26 +1,18 @@
+from __future__ import annotations
+
+from typing import Any, List
+
 from pydantic import BaseModel, EmailStr, Field
-from typing import List, Optional
 
 
-class AssessmentIn(BaseModel):
-    first_name: str
-    last_name: str
-    age: int
-
-
-class AssessmentOut(BaseModel):
-    risk_level: str
-    risk_score: float
-    saved_id: int
-
-
+# ----------------------------------------------------------------------- auth
 class RegisterIn(BaseModel):
-    first_name: str
-    last_name: str
+    first_name: str = Field(..., min_length=1, max_length=80)
+    last_name: str = Field(..., min_length=1, max_length=80)
     email: EmailStr
     password: str
-    role: Optional[str] = "Doctor"
-    hospital_name: Optional[str] = None
+    role: str | None = "Doctor"
+    hospital_name: str | None = Field(default=None, max_length=160)
 
 
 class LoginIn(BaseModel):
@@ -31,6 +23,36 @@ class LoginIn(BaseModel):
 class AuthOut(BaseModel):
     ok: bool
     message: str
+
+
+class UserOut(BaseModel):
+    id: int
+    full_name: str
+    first_name: str
+    last_name: str
+    email: str
+    role: str
+    role_status: str
+    hospital_name: str | None = None
+    created_at: Any | None = None
+    last_login_at: Any | None = None
+
+
+class LoginOut(BaseModel):
+    ok: bool
+    message: str
+    access_token: str | None = None
+    token_type: str = "bearer"
+    expires_in: int | None = None
+    user: UserOut | None = None
+    # Flat fields kept for backwards compatibility with older clients.
+    id: int | None = None
+    email: str | None = None
+    first_name: str | None = None
+    last_name: str | None = None
+    full_name: str | None = None
+    role: str | None = None
+    role_status: str | None = None
 
 
 class GenericMessageOut(BaseModel):
@@ -53,11 +75,12 @@ class ResetPasswordIn(BaseModel):
 
 
 class ChangePasswordIn(BaseModel):
-    email: EmailStr
+    email: EmailStr | None = None
     current_password: str
     new_password: str
 
 
+# ---------------------------------------------------------------------- admin
 class AdminRoleUpdateIn(BaseModel):
     role: str
 
@@ -73,12 +96,13 @@ class DoctorNurseAssignmentIn(BaseModel):
 
 class TriageDecisionIn(BaseModel):
     decision: str
-    note: Optional[str] = None
+    note: str | None = None
 
 
+# ----------------------------------------------------------------- prediction
 class PredictRequest(BaseModel):
-    first_name: str
-    last_name: str
+    first_name: str = Field(..., min_length=1, max_length=80)
+    last_name: str = Field(..., min_length=1, max_length=80)
     age: float
     sex: int
     cp: int
@@ -93,20 +117,49 @@ class PredictRequest(BaseModel):
     ca: int
     thal: int
 
+    model_config = {
+        "json_schema_extra": {
+            "example": {
+                "first_name": "Demo",
+                "last_name": "Patient",
+                "age": 58,
+                "sex": 1,
+                "cp": 4,
+                "trestbps": 156,
+                "chol": 286,
+                "fbs": 1,
+                "restecg": 1,
+                "thalach": 118,
+                "exang": 1,
+                "oldpeak": 2.8,
+                "slope": 2,
+                "ca": 2,
+                "thal": 7,
+            }
+        }
+    }
+
 
 class FeatureExplanation(BaseModel):
     feature: str
+    label: str | None = None
     value: float
     impact: float
     direction: str
 
 
 class PredictResponse(BaseModel):
+    case_id: int | None = None
     risk_probability: float = Field(..., ge=0.0, le=1.0)
     risk_level: str
     triage_recommendation: str
+    thresholds: dict | None = None
     explanation_summary: str
     gemini_summary: str | None = None
     top_features: List[FeatureExplanation]
     all_features: List[FeatureExplanation]
     base_value: float
+    model_version: str | None = None
+    model_name: str | None = None
+    clinical_context: dict | None = None
+    generated_at: str | None = None
