@@ -1,24 +1,54 @@
 # EC2 deployment troubleshooting
 
 Use this checklist when `https://meditrust.ddns.net/` stops responding after an
-AWS networking or instance change. Run the first section from any machine with
-normal Internet access, then run the remaining sections over SSH on the EC2
-instance.
+AWS networking or instance change. Commands that inspect services must run
+**inside the EC2 instance**, not in AWS CloudShell. A CloudShell prompt commonly
+looks like `~ $`; `systemctl` there reports that systemd is not PID 1 because
+CloudShell is a container.
 
-## 1. Verify DNS and the EC2 public address
+## 1. Locate and connect to the instance from CloudShell
+
+List running instances and their current addresses:
 
 ```bash
-dig +short meditrust.ddns.net A
-curl --fail --silent http://169.254.169.254/latest/meta-data/public-ipv4
+aws ec2 describe-instances \
+  --filters Name=instance-state-name,Values=running \
+  --query 'Reservations[].Instances[].{Name:Tags[?Key==`Name`]|[0].Value,ID:InstanceId,PublicIP:PublicIpAddress,PrivateIP:PrivateIpAddress,SecurityGroups:SecurityGroups[].GroupId}' \
+  --output table
 ```
 
-The addresses must match. The metadata command only works from EC2 instances
-where IMDSv1 is enabled; otherwise compare the DNS result with the public or
-Elastic IP displayed in the EC2 console. If the instance was stopped and does
-not use an Elastic IP, AWS may have assigned a new public IP. Update the No-IP
-DDNS record to that address, or associate an Elastic IP to prevent recurrence.
+If the table is empty, select the deployment's AWS Region in CloudShell or add
+`--region <region>` to the command. Then connect using **EC2 console → Instances
+→ select the instance → Connect**. Alternatively, if the private key is
+available locally, use the login name for the instance image:
 
-## 2. Verify AWS networking
+```bash
+ssh -i /path/to/key.pem ubuntu@<PublicIP>  # Ubuntu
+ssh -i /path/to/key.pem ec2-user@<PublicIP>  # Amazon Linux
+```
+
+Only continue to the service checks after the shell prompt is on that instance.
+
+## 2. Verify DNS and the EC2 public address
+
+```bash
+getent ahostsv4 meditrust.ddns.net
+```
+
+`getent` is normally preinstalled even when `dig` is unavailable. As another
+portable fallback, run:
+
+```bash
+python3 -c 'import socket; print(socket.gethostbyname("meditrust.ddns.net"))'
+```
+
+Compare the resolved address with `PublicIP` from the AWS CLI command above or
+with the public/Elastic IP displayed in the EC2 console. If the instance was
+stopped and does not use an Elastic IP, AWS may have assigned a new public IP.
+Update the No-IP DDNS record to that address, or associate an Elastic IP to
+prevent recurrence.
+
+## 3. Verify AWS networking
 
 Confirm that the instance is running and that its security group permits these
 inbound rules:
@@ -33,7 +63,7 @@ The subnet route table must also have a `0.0.0.0/0` route to an Internet
 Gateway. If a custom network ACL is in use, it must permit the web ports and
 return traffic on ephemeral ports.
 
-## 3. Verify the application and reverse proxy
+## 4. Verify the application and reverse proxy
 
 The production backend listens on port 8000, while Nginx should expose ports 80
 and 443:
@@ -48,6 +78,10 @@ sudo systemctl status nginx --no-pager
 sudo journalctl -u nginx -n 100 --no-pager
 sudo ss -lntp | grep -E ':(80|443|8000)\b'
 ```
+
+If `systemctl` again says systemd is not PID 1, the shell is still in CloudShell
+or another container rather than on the EC2 host. Return to section 1 and
+connect to the instance.
 
 Interpret the results as follows:
 
@@ -66,7 +100,7 @@ curl --fail https://meditrust.ddns.net/
 curl --fail https://meditrust.ddns.net/api/health
 ```
 
-## 4. Verify TLS
+## 5. Verify TLS
 
 If HTTP works but HTTPS fails, inspect the certificate and renewal status:
 
