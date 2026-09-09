@@ -16,6 +16,7 @@ IMAGE_TAG="${IMAGE_TAG:-latest}"
 IMAGE_REPO="${IMAGE_REPO:-ghcr.io/ravindrassk/meditrust}"
 HEALTH_URL="${HEALTH_URL:-http://127.0.0.1:8000/health/ready}"
 BRANCH="${BRANCH:-main}"
+DOCKER_BIN="${DOCKER_BIN:-docker}"
 
 if [[ -z "${DEPLOY_MODE:-}" ]]; then
   if command -v docker >/dev/null 2>&1; then DEPLOY_MODE=docker; else DEPLOY_MODE=native; fi
@@ -42,15 +43,25 @@ log "mode=$DEPLOY_MODE app_dir=$APP_DIR tag=$IMAGE_TAG"
 if [[ "$DEPLOY_MODE" == "docker" ]]; then
   export IMAGE_REPO IMAGE_TAG
   git fetch --quiet origin "$BRANCH" && git checkout --quiet "$BRANCH" && git reset --quiet --hard "origin/$BRANCH"
-  if docker compose -f docker-compose.yml -f deploy/docker-compose.prod.yml pull backend frontend; then
-    docker compose -f docker-compose.yml -f deploy/docker-compose.prod.yml up -d --remove-orphans
+  $DOCKER_BIN info >/dev/null 2>&1 || {
+    log "ERROR: the Docker daemon is not reachable as '$DOCKER_BIN'."
+    log "       On the instance:  sudo systemctl enable --now docker   (then re-run)"
+    log "       If you are in AWS CloudShell, connect to the EC2 instance first."
+    exit 1
+  }
+  $DOCKER_BIN compose version >/dev/null 2>&1 || {
+    log "ERROR: 'docker compose' is unavailable. Run ./deploy/ec2-bootstrap.sh to install it."
+    exit 1
+  }
+  if $DOCKER_BIN compose -f docker-compose.yml -f deploy/docker-compose.prod.yml pull backend frontend; then
+    $DOCKER_BIN compose -f docker-compose.yml -f deploy/docker-compose.prod.yml up -d --remove-orphans
   else
     # Images not published yet (or GHCR unreachable): build on the host instead.
     log "could not pull ${IMAGE_REPO}-*:${IMAGE_TAG}; building images locally"
-    docker compose up -d --build --remove-orphans
+    $DOCKER_BIN compose up -d --build --remove-orphans
   fi
   wait_for_health "$HEALTH_URL"
-  docker image prune -f >/dev/null 2>&1 || true
+  $DOCKER_BIN image prune -f >/dev/null 2>&1 || true
 else
   git fetch --quiet origin "$BRANCH" && git checkout --quiet "$BRANCH" && git reset --quiet --hard "origin/$BRANCH"
   if [[ ! -x "$APP_DIR/.venv/bin/python" ]]; then
