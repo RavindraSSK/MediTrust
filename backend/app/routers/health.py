@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import logging
+
 from fastapi import APIRouter, Depends, Response
 from sqlalchemy import text
 from sqlalchemy.orm import Session
@@ -13,6 +15,7 @@ from ..observability import metrics_payload
 from ..rag import get_clinical_context_service
 
 router = APIRouter(tags=["Health"])
+logger = logging.getLogger("meditrust")
 
 
 @router.get("/")
@@ -41,8 +44,9 @@ def readiness(response: Response, db: Session = Depends(get_db)):
     try:
         db.execute(text("SELECT 1"))
         checks["database"] = {"ok": True, "dialect": engine.dialect.name}
-    except Exception as exc:  # noqa: BLE001
-        checks["database"] = {"ok": False, "error": str(exc)}
+    except Exception:  # noqa: BLE001
+        logger.exception("Readiness database check failed")
+        checks["database"] = {"ok": False, "error": "Database connectivity check failed."}
 
     try:
         model_service.ensure_loaded()
@@ -51,15 +55,17 @@ def readiness(response: Response, db: Session = Depends(get_db)):
             "name": model_service.info().get("model_name"),
             "version": model_service.model_version,
         }
-    except Exception as exc:  # noqa: BLE001
-        checks["model"] = {"ok": False, "error": str(exc)}
+    except Exception:  # noqa: BLE001
+        logger.exception("Readiness model check failed")
+        checks["model"] = {"ok": False, "error": "Model readiness check failed."}
 
     if settings.rag_enabled:
         try:
             status = get_clinical_context_service().status()
             checks["rag"] = {"ok": status["passages"] > 0, **status}
-        except Exception as exc:  # noqa: BLE001
-            checks["rag"] = {"ok": False, "error": str(exc)}
+        except Exception:  # noqa: BLE001
+            logger.exception("Readiness RAG check failed")
+            checks["rag"] = {"ok": False, "error": "RAG readiness check failed."}
     else:
         checks["rag"] = {"ok": True, "enabled": False}
 
