@@ -129,7 +129,9 @@ fi
 ENV_FILE="$APP_DIR/backend/.env"
 if [[ ! -f "$ENV_FILE" ]]; then
   log "creating $ENV_FILE (add GEMINI_API_KEY, SMTP, RDS and S3 settings afterwards)"
-  ADMIN_PASSWORD_VALUE="${ADMIN_PASSWORD:-$(openssl rand -base64 12 | tr -d '/+=' | cut -c1-10)A1!}"
+  # Suffix guarantees the generated password satisfies the API policy (upper, lower, digit,
+  # special), which a purely random base64 slice does not.
+  ADMIN_PASSWORD_VALUE="${ADMIN_PASSWORD:-$(openssl rand -base64 12 | tr -d '/+=' | cut -c1-10)aA1!}"
   cat > "$ENV_FILE" <<ENV
 APP_ENV=production
 ADMIN_EMAIL=${ADMIN_EMAIL:-meditrust@gmail.com}
