@@ -9,6 +9,7 @@
 set -euo pipefail
 
 PUBLIC_HOST="${PUBLIC_HOST:-meditrust.ddns.net}"
+DEPLOY_BRANCH="${DEPLOY_BRANCH:-claude/clinical-risk-platform-completion-ohnfgm}"
 
 # AWS CLI v2 pipes output through a pager (less) by default. On exit the pager restores the
 # terminal screen, which erases everything this script printed. Disable it globally and per call.
@@ -72,6 +73,20 @@ echo "== Elastic IPs =="
 aws --no-cli-pager ec2 describe-addresses \
   --query 'Addresses[].{IP:PublicIp,AllocationId:AllocationId,AttachedTo:InstanceId}' --output table
 
+if [[ "$PUBLIC_IP" != "None" && -n "$PUBLIC_IP" ]]; then
+  echo
+  echo "== Is the application answering on ${PUBLIC_IP}? =="
+  APP_UP=0
+  for URL in "http://${PUBLIC_IP}/api/health/ready" "http://${PUBLIC_IP}:8000/health/ready" "http://${PUBLIC_IP}/"; do
+    CODE="$(curl -s -o /dev/null -m 8 -w '%{http_code}' "$URL" 2>/dev/null || echo 000)"
+    case "$CODE" in
+      000) echo "  $URL -> no response (nothing listening, or blocked)" ;;
+      200) echo "  $URL -> $CODE OK"; APP_UP=1 ;;
+      *)   echo "  $URL -> $CODE"; APP_UP=1 ;;
+    esac
+  done
+fi
+
 echo
 echo "== Assessment =="
 [[ "$STATE" == "running" ]] \
@@ -85,7 +100,16 @@ if [[ -n "$DNS_IP" && "$PUBLIC_IP" != "None" && "$DNS_IP" != "$PUBLIC_IP" ]]; th
   echo "    aws ec2 associate-address --instance-id $INSTANCE_ID --allocation-id <eipalloc-...>"
 fi
 
+if [[ "${APP_UP:-0}" == "1" ]]; then
+  echo "  The application IS responding on the instance IP, so this is only a DNS problem."
+  echo "  Point ${PUBLIC_HOST} at ${PUBLIC_IP} in the No-IP dashboard and the site returns."
+else
+  echo "  Nothing is answering on the instance, so the stack also needs to be (re)started."
+fi
+
 echo
-echo "  Connect and deploy:"
+echo "  Connect to the instance:"
 echo "    aws ssm start-session --target $INSTANCE_ID     # no SSH key needed (requires SSM agent + role)"
-echo "    curl -fsSL https://raw.githubusercontent.com/RavindraSSK/MediTrust/main/deploy/ec2-bootstrap.sh | bash"
+echo "  Then deploy on the instance (use the PR branch until PR #79 is merged into main):"
+echo "    curl -fsSL https://raw.githubusercontent.com/RavindraSSK/MediTrust/${DEPLOY_BRANCH}/deploy/ec2-bootstrap.sh \\"
+echo "      | BRANCH=${DEPLOY_BRANCH} bash"
