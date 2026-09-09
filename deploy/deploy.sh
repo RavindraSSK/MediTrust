@@ -42,8 +42,13 @@ log "mode=$DEPLOY_MODE app_dir=$APP_DIR tag=$IMAGE_TAG"
 if [[ "$DEPLOY_MODE" == "docker" ]]; then
   export IMAGE_REPO IMAGE_TAG
   git fetch --quiet origin "$BRANCH" && git checkout --quiet "$BRANCH" && git reset --quiet --hard "origin/$BRANCH"
-  docker compose -f docker-compose.yml -f deploy/docker-compose.prod.yml pull backend frontend
-  docker compose -f docker-compose.yml -f deploy/docker-compose.prod.yml up -d --remove-orphans
+  if docker compose -f docker-compose.yml -f deploy/docker-compose.prod.yml pull backend frontend; then
+    docker compose -f docker-compose.yml -f deploy/docker-compose.prod.yml up -d --remove-orphans
+  else
+    # Images not published yet (or GHCR unreachable): build on the host instead.
+    log "could not pull ${IMAGE_REPO}-*:${IMAGE_TAG}; building images locally"
+    docker compose up -d --build --remove-orphans
+  fi
   wait_for_health "$HEALTH_URL"
   docker image prune -f >/dev/null 2>&1 || true
 else
