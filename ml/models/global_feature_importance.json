@@ -1,0 +1,111 @@
+{
+  "method": "PermutationExplainer",
+  "samples": 60,
+  "output": "probability of disease (class 1)",
+  "features": [
+    {
+      "feature": "ca",
+      "label": "Major vessels on fluoroscopy",
+      "mean_abs_shap": 0.142068,
+      "share": 0.1956,
+      "mean_shap": 0.006724,
+      "rank": 1
+    },
+    {
+      "feature": "cp",
+      "label": "Chest pain type",
+      "mean_abs_shap": 0.135082,
+      "share": 0.1859,
+      "mean_shap": 0.01594,
+      "rank": 2
+    },
+    {
+      "feature": "thal",
+      "label": "Thallium stress test result",
+      "mean_abs_shap": 0.10059,
+      "share": 0.1385,
+      "mean_shap": 0.006658,
+      "rank": 3
+    },
+    {
+      "feature": "slope",
+      "label": "Peak exercise ST-segment slope",
+      "mean_abs_shap": 0.075463,
+      "share": 0.1039,
+      "mean_shap": 0.00046,
+      "rank": 4
+    },
+    {
+      "feature": "sex",
+      "label": "Sex",
+      "mean_abs_shap": 0.071141,
+      "share": 0.0979,
+      "mean_shap": 0.006572,
+      "rank": 5
+    },
+    {
+      "feature": "oldpeak",
+      "label": "Exercise-induced ST depression",
+      "mean_abs_shap": 0.054968,
+      "share": 0.0757,
+      "mean_shap": 0.010183,
+      "rank": 6
+    },
+    {
+      "feature": "trestbps",
+      "label": "Resting blood pressure",
+      "mean_abs_shap": 0.032516,
+      "share": 0.0448,
+      "mean_shap": 0.003654,
+      "rank": 7
+    },
+    {
+      "feature": "thalach",
+      "label": "Maximum heart rate achieved",
+      "mean_abs_shap": 0.031508,
+      "share": 0.0434,
+      "mean_shap": 0.000719,
+      "rank": 8
+    },
+    {
+      "feature": "exang",
+      "label": "Exercise-induced angina",
+      "mean_abs_shap": 0.023232,
+      "share": 0.032,
+      "mean_shap": -0.001899,
+      "rank": 9
+    },
+    {
+      "feature": "chol",
+      "label": "Total cholesterol",
+      "mean_abs_shap": 0.020098,
+      "share": 0.0277,
+      "mean_shap": -0.008073,
+      "rank": 10
+    },
+    {
+      "feature": "restecg",
+      "label": "Resting ECG result",
+      "mean_abs_shap": 0.020002,
+      "share": 0.0275,
+      "mean_shap": 0.002356,
+      "rank": 11
+    },
+    {
+      "feature": "fbs",
+      "label": "Fasting blood sugar",
+      "mean_abs_shap": 0.012264,
+      "share": 0.0169,
+      "mean_shap": 0.005019,
+      "rank": 12
+    },
+    {
+      "feature": "age",
+      "label": "Age",
+      "mean_abs_shap": 0.007529,
+      "share": 0.0104,
+      "mean_shap": 0.001392,
+      "rank": 13
+    }
+  ]
+}

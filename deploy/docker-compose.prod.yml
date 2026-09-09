@@ -1,0 +1,16 @@
+# Production override: run the images published to GHCR instead of building locally.
+#   docker compose -f docker-compose.yml -f deploy/docker-compose.prod.yml up -d
+services:
+  backend:
+    image: ${IMAGE_REPO:-ghcr.io/ravindrassk/meditrust}-backend:${IMAGE_TAG:-latest}
+    build: !reset null
+    restart: always
+    environment:
+      APP_ENV: production
+      LOG_JSON: "true"
+  frontend:
+    image: ${IMAGE_REPO:-ghcr.io/ravindrassk/meditrust}-frontend:${IMAGE_TAG:-latest}
+    build: !reset null
+    restart: always
+    ports:
+      - "80:80"

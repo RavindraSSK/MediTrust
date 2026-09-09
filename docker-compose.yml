@@ -1,17 +1,68 @@
+# Full local stack: PostgreSQL + FastAPI backend + React frontend (nginx).
+#   docker compose up -d --build        # everything
+#   docker compose up -d db             # only the database (run the API with uvicorn locally)
+# Frontend: http://localhost:8080   API: http://localhost:8000/docs
 services:
   db:
     image: postgres:16
     container_name: meditrust_db
     restart: always
     environment:
-      POSTGRES_USER: meditrust
-      POSTGRES_PASSWORD: meditrust_pw
-      POSTGRES_DB: meditrust_db
+      POSTGRES_USER: ${POSTGRES_USER:-meditrust}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-meditrust_pw}
+      POSTGRES_DB: ${POSTGRES_DB:-meditrust_db}
     ports:
-
       - "5433:5432"
     volumes:
       - meditrust_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-meditrust} -d ${POSTGRES_DB:-meditrust_db}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    container_name: meditrust_backend
+    restart: unless-stopped
+    env_file:
+      - path: backend/.env
+        required: false
+    environment:
+      DATABASE_URL: postgresql+psycopg2://${POSTGRES_USER:-meditrust}:${POSTGRES_PASSWORD:-meditrust_pw}@db:5432/${POSTGRES_DB:-meditrust_db}
+      ADMIN_EMAIL: ${ADMIN_EMAIL:-meditrust@gmail.com}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-DevAdmin@2026}
+      JWT_SECRET: ${JWT_SECRET:-change-me-in-production}
+      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-http://localhost:8080,http://127.0.0.1:8080}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      MODEL_S3_URI: ${MODEL_S3_URI:-}
+      AWS_REGION: ${AWS_REGION:-}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8000/health/ready"]
+      interval: 30s
+      timeout: 5s
+      start_period: 60s
+      retries: 3
+
+  frontend:
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile
+    container_name: meditrust_frontend
+    restart: unless-stopped
+    ports:
+      - "8080:80"
+    depends_on:
+      backend:
+        condition: service_healthy
 
 volumes:
   meditrust_pgdata:
