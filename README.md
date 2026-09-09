@@ -24,7 +24,34 @@
 - Completed nurse and doctor dashboard workflows
 - Implemented case status flow and performed final testing
 - Deployed (AWS-EC2)
-- website : http://meditrust.ddns.net/
+- Website: https://meditrust.ddns.net/
+
+### EC2 deployment health check
+
+After changing an instance, Elastic IP, security group, or DNS setting, verify the
+deployment from the EC2 host in this order:
+
+```bash
+# The DDNS record must resolve to the instance's current public/Elastic IP.
+dig +short meditrust.ddns.net A
+
+# The application process and reverse proxy must both be running.
+sudo systemctl status meditrust --no-pager
+sudo systemctl status nginx --no-pager
+curl --fail http://127.0.0.1:8000/health
+sudo nginx -t
+
+# AWS security-group inbound rules must allow TCP 80 and 443.
+# After correcting configuration, restart both services.
+sudo systemctl restart meditrust nginx
+curl --fail https://meditrust.ddns.net/api/health
+```
+
+If the first command returns no address or an old address, update the DDNS
+record before changing the application. If the local health check fails, inspect
+`sudo journalctl -u meditrust -n 100 --no-pager`; if only the public check fails,
+check the EC2 security group, network ACL, Nginx configuration, and TLS
+certificate.
 
 
 Team:

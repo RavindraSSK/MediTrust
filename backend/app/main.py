@@ -1,14 +1,17 @@
-from fastapi import FastAPI, Depends, Header, HTTPException
+from fastapi import FastAPI, Depends, Header, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 from sqlalchemy import text
 from passlib.context import CryptContext
 from dotenv import load_dotenv
 import os
+import secrets
 from datetime import datetime, timezone
 
 load_dotenv()
-from .db import Base, engine, get_db
+from .db import Base, engine, get_db, SessionLocal
+from .rate_limit import LoginRateLimiter
 from . import models
 from .models import User
 from .schemas import (
@@ -33,6 +36,25 @@ from .auth import router as auth_extra_router
 app = FastAPI(title="MediTrust API", version="0.1")
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+
+ADMIN_EMAIL = (os.getenv("ADMIN_EMAIL") or "meditrust@gmail.com").lower().strip()
+UNIVERSAL_ADMIN_ROLE = "Admin"
+UNIVERSAL_ADMIN_STATUS = "approved"
+login_rate_limiter = LoginRateLimiter(max_attempts=5, window_seconds=900)
+
+
+def _get_admin_password_from_env() -> str | None:
+    value = os.getenv("ADMIN_PASSWORD")
+    if value is None:
+        return None
+    return value.strip() or None
+
+
+def get_client_ip(request: Request) -> str:
+    forwarded = request.headers.get("x-forwarded-for")
+    if forwarded:
+        return forwarded.split(",")[0].strip()
+    return request.client.host if request.client else "unknown"
 
 ALLOWED_ORIGINS = [
     "http://127.0.0.1:5500",
@@ -351,6 +373,51 @@ def serialize_user(user: User):
     }
 
 
+def is_universal_admin(user: User) -> bool:
+    return (user.email or "").lower().strip() == ADMIN_EMAIL
+
+
+def ensure_universal_admin(db: Session):
+    admin = db.query(User).filter(User.email == ADMIN_EMAIL).first()
+    env_password = _get_admin_password_from_env()
+
+    if not admin:
+        password = env_password or secrets.token_urlsafe(16)
+        if not env_password:
+            print(
+                f"[MediTrust] ADMIN_PASSWORD is not set. Generated a one-time admin "
+                f"password for {ADMIN_EMAIL}: {password}"
+            )
+            print("[MediTrust] Set ADMIN_PASSWORD in the environment and restart to control this credential.")
+
+        admin = User(
+            full_name="MediTrust Admin",
+            first_name="MediTrust",
+            last_name="Admin",
+            email=ADMIN_EMAIL,
+            password_hash=pwd_context.hash(password),
+            role=UNIVERSAL_ADMIN_ROLE,
+            role_status=UNIVERSAL_ADMIN_STATUS,
+            hospital_name="MediTrust",
+        )
+        db.add(admin)
+        db.commit()
+        return
+
+    changed = False
+    if admin.role != UNIVERSAL_ADMIN_ROLE:
+        admin.role = UNIVERSAL_ADMIN_ROLE
+        changed = True
+    if (getattr(admin, "role_status", None) or "").lower() != UNIVERSAL_ADMIN_STATUS:
+        admin.role_status = UNIVERSAL_ADMIN_STATUS
+        changed = True
+    if env_password and not pwd_context.verify(env_password, admin.password_hash):
+        admin.password_hash = pwd_context.hash(env_password)
+        changed = True
+    if changed:
+        db.commit()
+
+
 def get_admin_user(
     x_admin_email: str = Header(default=""),
     db: Session = Depends(get_db),
@@ -394,6 +461,11 @@ def serialize_assignment(assignment, doctor: User, nurse: User):
 def on_startup():
     Base.metadata.create_all(bind=engine)
     migrate_name_columns()
+    db = SessionLocal()
+    try:
+        ensure_universal_admin(db)
+    finally:
+        db.close()
 
 
 @app.get("/")
@@ -453,15 +525,32 @@ def register(data: RegisterIn, db: Session = Depends(get_db)):
 
 
 @app.post("/auth/login")
-def login(data: LoginIn, db: Session = Depends(get_db)):
+def login(data: LoginIn, request: Request, db: Session = Depends(get_db)):
     email = data.email.lower().strip()
+    rate_limit_key = f"{email}|{get_client_ip(request)}"
+
+    retry_after = login_rate_limiter.seconds_until_unblocked(rate_limit_key)
+    if retry_after:
+        return JSONResponse(
+            status_code=429,
+            content={
+                "ok": False,
+                "message": f"Too many failed login attempts. Please try again in {retry_after} seconds.",
+            },
+            headers={"Retry-After": str(retry_after)},
+        )
 
     user = db.query(User).filter(User.email == email).first()
     if not user:
+        login_rate_limiter.register_failure(rate_limit_key)
         return {"ok": False, "message": "Invalid email or password."}
 
-    if not pwd_context.verify(data.password, user.password_hash):
+    password, password_error = validate_password_for_bcrypt(data.password)
+    if password_error == "Password is too long for secure storage." or not pwd_context.verify(password, user.password_hash):
+        login_rate_limiter.register_failure(rate_limit_key)
         return {"ok": False, "message": "Invalid email or password."}
+
+    login_rate_limiter.reset(rate_limit_key)
 
     role_status = getattr(user, "role_status", "approved") or "approved"
     if role_status != "approved":
@@ -850,6 +939,8 @@ def admin_update_user_role(
     admin: User = Depends(get_admin_user),
 ):
     user = get_user_or_404(user_id, db)
+    if is_universal_admin(user) and normalize_role(data.role) != UNIVERSAL_ADMIN_ROLE:
+        raise HTTPException(status_code=400, detail="The permanent system admin must remain Admin.")
     if user.id == admin.id:
         raise HTTPException(status_code=400, detail="Admins cannot change their own role from this screen.")
 
@@ -871,10 +962,12 @@ def admin_update_user_role_status(
     admin: User = Depends(get_admin_user),
 ):
     user = get_user_or_404(user_id, db)
+    role_status = (data.role_status or "").strip().lower()
+    if is_universal_admin(user) and role_status != UNIVERSAL_ADMIN_STATUS:
+        raise HTTPException(status_code=400, detail="The permanent system admin must remain approved.")
     if user.id == admin.id:
         raise HTTPException(status_code=400, detail="Admins cannot change their own approval status from this screen.")
 
-    role_status = (data.role_status or "").strip().lower()
     if role_status not in VALID_ROLE_STATUSES:
         raise HTTPException(status_code=400, detail="Unsupported approval status.")
 
@@ -891,6 +984,8 @@ def admin_delete_user(
     admin: User = Depends(get_admin_user),
 ):
     user = get_user_or_404(user_id, db)
+    if is_universal_admin(user):
+        raise HTTPException(status_code=400, detail="The permanent system admin cannot be deleted.")
     if user.id == admin.id:
         raise HTTPException(status_code=400, detail="Admins cannot delete their own account.")
 
