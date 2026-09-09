@@ -17,10 +17,19 @@ aws ec2 describe-instances \
   --output table
 ```
 
-If the table is empty, select the deployment's AWS Region in CloudShell or add
-`--region <region>` to the command. Then connect using **EC2 console → Instances
-→ select the instance → Connect**. Alternatively, if the private key is
-available locally, use the login name for the instance image:
+If the table is empty, select the deployment's AWS Region in CloudShell. Values
+written in angle brackets in this guide are placeholders; do not enter text
+such as `YOUR_REGION` literally. To discover the active region and reuse it in
+commands, run:
+
+```bash
+REGION="${AWS_REGION:-${AWS_DEFAULT_REGION:-$(aws configure get region)}}"
+printf 'Using AWS Region: %s\n' "$REGION"
+```
+
+Then connect using **EC2 console → Instances → select the instance → Connect**.
+Alternatively, if the private key is available locally, use the login name for
+the instance image:
 
 ```bash
 ssh -i /path/to/key.pem ubuntu@<PublicIP>  # Ubuntu
@@ -28,6 +37,22 @@ ssh -i /path/to/key.pem ec2-user@<PublicIP>  # Amazon Linux
 ```
 
 Only continue to the service checks after the shell prompt is on that instance.
+
+CloudShell can also confirm the instance status and display the effective
+security-group rules before connecting. Substitute the IDs printed by the first
+command:
+
+```bash
+aws ec2 describe-instance-status \
+  --instance-ids <InstanceID> \
+  --include-all-instances \
+  --output table
+
+aws ec2 describe-security-groups \
+  --group-ids <SecurityGroupID> \
+  --query 'SecurityGroups[].IpPermissions' \
+  --output json
+```
 
 ## 2. Verify DNS and the EC2 public address
 
