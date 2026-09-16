@@ -1,0 +1,44 @@
+# Render Blueprint for the MediTrust backend, used with a free-tier deployment that
+# pairs Render (backend) + Cloudflare Pages (frontend) + Neon (Postgres) — see
+# "Free-tier alternative" in deploy/README.md for the full walkthrough and the
+# reasoning behind this split.
+#
+# Usage: Render dashboard -> New -> Blueprint -> pick this repository. Render reads
+# this file and creates the service below. If blueprint parsing ever rejects a field
+# (Render's schema does change), create the service manually instead: New -> Web
+# Service -> Docker -> Dockerfile path backend/Dockerfile, Docker context "." — the
+# env vars below are still the ones to set by hand.
+#
+# This does NOT provision a database. Render's own free Postgres expires after 30
+# days; use a Neon (or Supabase) free Postgres instead and paste its connection
+# string into DATABASE_URL after the service is created.
+services:
+  - type: web
+    name: meditrust-backend
+    runtime: docker
+    plan: free
+    region: oregon
+    dockerfilePath: backend/Dockerfile
+    dockerContext: .
+    healthCheckPath: /health
+    envVars:
+      - key: APP_ENV
+        value: production
+      - key: LOG_JSON
+        value: "true"
+      # Paste the Neon (or Supabase) connection string here after creating that database.
+      - key: DATABASE_URL
+        sync: false
+      - key: JWT_SECRET
+        generateValue: true
+      - key: ADMIN_EMAIL
+        value: meditrust@gmail.com
+      - key: ADMIN_PASSWORD
+        generateValue: true
+      # The Cloudflare Pages URL (e.g. https://meditrust.pages.dev), comma-separated
+      # if you add a custom domain later. Local dev origins are always allowed too.
+      - key: ALLOWED_ORIGINS
+        sync: false
+      # Optional: leave blank to use the deterministic RAG narrative template.
+      - key: GEMINI_API_KEY
+        sync: false

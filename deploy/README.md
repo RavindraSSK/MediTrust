@@ -15,6 +15,10 @@ database on RDS and model artifacts on S3.
                                                             └─ Gemini (optional, RAG narrative)
 ```
 
+> **No budget for AWS?** Skip straight to [section 7](#7-free-tier-alternative-cloudflare-pages--render--neon)
+> for a genuinely $0, no-credit-card-required deployment that also auto-deploys on every
+> push to `main` — no EC2, no SSM sessions, no manual `deploy.sh`.
+
 ## 1. Local full stack
 
 ```bash
@@ -227,3 +231,97 @@ to *inspect* the account and to *connect*; run the bootstrap on the EC2 host its
 Stop the instance and release the Elastic IP (an unattached Elastic IP is billed), or take an AMI
 snapshot. The repository plus `ec2-bootstrap.sh` recreates the whole environment later; only the
 database contents are lost, so run `pg_dump` first if the recorded cases matter.
+
+## 7. Free-tier alternative: Cloudflare Pages + Render + Neon
+
+No AWS account, no credit card anywhere in this path, and every piece auto-deploys on
+`git push` — the exact thing the EC2 path above never managed to do reliably.
+
+```
+   GitHub                    Cloudflare Pages                     Render
+   push to main ──┬────► builds frontend/ (Vite) ────► https://<app>.pages.dev
+                  └────► builds backend/Dockerfile ──► https://<app>.onrender.com
+                                                              │
+                                                              ▼
+                                                     Neon (serverless Postgres)
+```
+
+Why this combination and not another: Fly.io's free allowance is gone for new
+accounts as of late 2024 (pay-as-you-go only now); Render's own free Postgres expires
+after 30 days, which loses your data, so Neon (or Supabase) stands in for it instead;
+Cloudflare Pages has no credit card, no expiry, and effectively unlimited bandwidth
+for a static React build. Render's own free web service sleeps after 15 minutes idle
+and takes about a minute to wake on the next request — acceptable for a portfolio
+project, not for something that needs to answer instantly at 3am.
+
+### 7.1 Database — Neon (5 minutes)
+
+1. [neon.tech](https://neon.tech) → sign up (no card) → New Project.
+2. Copy the connection string it shows you (`postgresql://...`). That is your
+   `DATABASE_URL` — psycopg2 needs the `postgresql+psycopg2://` scheme, so change the
+   prefix, e.g. `postgresql+psycopg2://user:pass@ep-xxx.neon.tech/neondb?sslmode=require`.
+   Keep it somewhere; you paste it into Render next.
+
+### 7.2 Backend — Render (10 minutes)
+
+1. [render.com](https://render.com) → sign up (no card) → **New → Blueprint** → connect
+   this GitHub repository. Render reads `render.yaml` at the repo root and proposes a
+   `meditrust-backend` Docker web service on the free plan.
+   - If blueprint parsing rejects a field (Render's schema changes over time), create
+     it manually instead: **New → Web Service → Docker**, Dockerfile path
+     `backend/Dockerfile`, Docker build context `.` (repository root).
+2. Before the first deploy, set these environment variables on the service (Render
+   generates `JWT_SECRET` and `ADMIN_PASSWORD` for you if you used the blueprint):
+   | Key | Value |
+   | --- | --- |
+   | `DATABASE_URL` | the Neon connection string from 7.1, with `postgresql+psycopg2://` |
+   | `APP_ENV` | `production` |
+   | `ALLOWED_ORIGINS` | leave blank for now — comes back in step 7.4 |
+   | `GEMINI_API_KEY` | optional; blank uses the deterministic RAG template |
+3. Deploy. Watch the build logs, then open `https://<your-service>.onrender.com/health/ready` —
+   it should report the database, model and RAG index all `ok: true`. The admin login
+   is `meditrust@gmail.com` with the `ADMIN_PASSWORD` Render generated (Environment tab).
+
+### 7.3 Frontend — Cloudflare Pages (5 minutes)
+
+1. [dash.cloudflare.com](https://dash.cloudflare.com) → **Workers & Pages → Create →
+   Pages → Connect to Git** → this repository.
+2. Build settings:
+   | Setting | Value |
+   | --- | --- |
+   | Root directory | `frontend` |
+   | Build command | `npm run build` |
+   | Build output directory | `dist` |
+   | Environment variable | `VITE_API_BASE` = `https://<your-service>.onrender.com` (no `/api`, no trailing slash — this setup has no nginx proxy step, so the React app calls Render directly) |
+3. Deploy. Cloudflare gives you `https://<project>.pages.dev`.
+
+### 7.4 Wire them together
+
+1. Back in Render, set `ALLOWED_ORIGINS` to the `.pages.dev` URL from 7.3 (comma-separated
+   if you add more origins later) and save — this restarts the service.
+2. Your site's address is now `https://<project>.pages.dev`. Share that link.
+
+`meditrust.ddns.net` cannot be pointed here: it is a domain No-IP itself owns, and
+No-IP does not allow a CNAME record on its own domains, only an A record to a fixed
+IP address — which is exactly the problem this whole path avoids, since Cloudflare
+Pages has no single IP to give you and needs none. If you want a real custom domain
+instead of the `.pages.dev` one, buy one (a few dollars a year from any registrar,
+Cloudflare included) and add it under **Custom domains** in the Pages project; that
+is the only step in this entire section that costs money, and it is optional.
+Retire the No-IP hostname once you stop using the EC2 path — it no longer needs to
+follow anything.
+3. Confirm: open the Pages URL, log in, run a prediction, and check that the
+   evidence-grounded RAG panel and its citations appear below the SHAP explanation.
+
+### 7.5 Living with the free tiers
+
+- **Render sleeps after 15 minutes idle.** The first request after a quiet spell takes
+  about a minute. A free uptime monitor (e.g. UptimeRobot, pinging `/health` every 10
+  minutes) keeps it warm during hours you expect traffic; do not run it 24/7 against a
+  free service, since 750 instance-hours/month covers one always-on service but not
+  much slack beyond that.
+- **Neon scales to zero after 5 minutes idle**, autoscaling back up on the next query
+  in well under a second. This is normal, not a fault.
+- **Everything here auto-deploys on push to `main`** — Render and Cloudflare Pages both
+  watch the GitHub repo directly. `.github/workflows/deploy.yml` (the SSH-to-EC2
+  workflow) is unrelated to this path and can be left alone or disabled.
